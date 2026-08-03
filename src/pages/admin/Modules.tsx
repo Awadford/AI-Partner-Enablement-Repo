@@ -3,10 +3,20 @@ import { supabase } from '../../lib/supabase'
 import { Layout } from '../../components/Layout'
 import { LmsModule } from '../../types'
 
+interface EditState {
+  video_url: string
+  exec_url: string
+  exec_prompt: string
+}
+
 export function AdminModules() {
   const [modules, setModules] = useState<LmsModule[]>([])
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [editing, setEditing] = useState<string | null>(null)
+  const [editState, setEditState] = useState<EditState>({ video_url: '', exec_url: '', exec_prompt: '' })
+  const [saving, setSaving] = useState(false)
+  const [saveMsg, setSaveMsg] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -20,6 +30,39 @@ export function AdminModules() {
     load()
   }, [])
 
+  function startEdit(mod: LmsModule) {
+    setEditing(mod.id)
+    setEditState({
+      video_url: mod.content?.video_url ?? '',
+      exec_url: mod.content?.exec_url ?? '',
+      exec_prompt: mod.content?.exec_prompt ?? '',
+    })
+  }
+
+  async function saveEdit(mod: LmsModule) {
+    setSaving(true)
+    const updatedContent = {
+      ...mod.content,
+      video_url: editState.video_url || null,
+      exec_url: editState.exec_url || null,
+      exec_prompt: editState.exec_prompt || undefined,
+    }
+    const { error } = await supabase
+      .from('lms_modules')
+      .update({ content: updatedContent, updated_at: new Date().toISOString() })
+      .eq('id', mod.id)
+
+    if (!error) {
+      setModules(prev => prev.map(m => m.id === mod.id ? { ...m, content: updatedContent } : m))
+      setSaveMsg('Saved!')
+      setTimeout(() => setSaveMsg(null), 2000)
+    } else {
+      setSaveMsg('Error saving')
+    }
+    setSaving(false)
+    setEditing(null)
+  }
+
   const categoryColors: Record<string, string> = {
     delivery: 'bg-blue-100 text-blue-700',
     product: 'bg-purple-100 text-purple-700',
@@ -29,9 +72,16 @@ export function AdminModules() {
   return (
     <Layout>
       <div className="max-w-5xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-pendo-navy">Module Catalog</h1>
-          <p className="text-gray-500 mt-1">{modules.length} modules in the system</p>
+        <div className="mb-6 flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-pendo-navy">Module Catalog</h1>
+            <p className="text-gray-500 mt-1">{modules.length} modules — click a module to edit video and exec.com URLs</p>
+          </div>
+          {saveMsg && (
+            <span className={`text-sm font-medium px-3 py-1 rounded-full ${saveMsg === 'Saved!' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+              {saveMsg}
+            </span>
+          )}
         </div>
 
         {loading ? (
@@ -95,6 +145,88 @@ export function AdminModules() {
                         <div className="text-xl font-bold text-pendo-navy">{mod.content?.video_url ? '✓' : '—'}</div>
                         <div className="text-xs text-gray-500">Video</div>
                       </div>
+                    </div>
+
+                    {/* URL / exec.com edit section */}
+                    <div className="bg-white rounded-lg border border-gray-200 p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Video & exec.com URLs</p>
+                        {editing !== mod.id && (
+                          <button
+                            onClick={() => startEdit(mod)}
+                            className="text-xs text-pendo-pink font-semibold hover:underline"
+                          >
+                            Edit
+                          </button>
+                        )}
+                      </div>
+
+                      {editing === mod.id ? (
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Video URL</label>
+                            <input
+                              type="text"
+                              value={editState.video_url}
+                              onChange={e => setEditState(s => ({ ...s, video_url: e.target.value }))}
+                              placeholder="https://… (MP4, YouTube, Vimeo, Loom)"
+                              className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-pendo-pink"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">exec.com Session URL</label>
+                            <input
+                              type="text"
+                              value={editState.exec_url}
+                              onChange={e => setEditState(s => ({ ...s, exec_url: e.target.value }))}
+                              placeholder="https://app.exec.com/sessions/…"
+                              className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-pendo-pink"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">exec.com Practice Prompt</label>
+                            <textarea
+                              value={editState.exec_prompt}
+                              onChange={e => setEditState(s => ({ ...s, exec_prompt: e.target.value }))}
+                              rows={3}
+                              placeholder="Describe the scenario the learner should practice…"
+                              className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-pendo-pink resize-none"
+                            />
+                          </div>
+                          <div className="flex gap-2 pt-1">
+                            <button
+                              onClick={() => saveEdit(mod)}
+                              disabled={saving}
+                              className="px-4 py-1.5 bg-pendo-pink text-white text-sm font-semibold rounded-lg hover:bg-opacity-90 disabled:opacity-50 transition-colors"
+                            >
+                              {saving ? 'Saving…' : 'Save'}
+                            </button>
+                            <button
+                              onClick={() => setEditing(null)}
+                              className="px-4 py-1.5 bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-300 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2 text-sm">
+                          <div className="flex gap-2">
+                            <span className="text-gray-500 w-20 flex-shrink-0">Video:</span>
+                            <span className="text-gray-800 truncate">{mod.content?.video_url || <span className="text-gray-400 italic">not set</span>}</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <span className="text-gray-500 w-20 flex-shrink-0">exec.com:</span>
+                            <span className="text-gray-800 truncate">{mod.content?.exec_url || <span className="text-gray-400 italic">not set</span>}</span>
+                          </div>
+                          {mod.content?.exec_prompt && (
+                            <div className="flex gap-2">
+                              <span className="text-gray-500 w-20 flex-shrink-0">Prompt:</span>
+                              <span className="text-gray-800 line-clamp-2">{mod.content.exec_prompt}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

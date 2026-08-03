@@ -6,6 +6,49 @@ import { supabase } from '../../lib/supabase'
 import { Layout } from '../../components/Layout'
 import { LmsModule, ModuleDoc, ModuleRecording } from '../../types'
 
+// Detects whether a URL is a direct video file or an embed (YouTube/Vimeo/Loom)
+function VideoPlayer({ url, title }: { url: string; title: string }) {
+  const isEmbed = /youtube\.com|youtu\.be|vimeo\.com|loom\.com|wistia\.com/i.test(url)
+
+  if (isEmbed) {
+    // For YouTube, convert watch URL to embed URL
+    let embedUrl = url
+    if (url.includes('youtube.com/watch')) {
+      const videoId = new URL(url).searchParams.get('v')
+      if (videoId) embedUrl = `https://www.youtube.com/embed/${videoId}`
+    } else if (url.includes('youtu.be/')) {
+      const videoId = url.split('youtu.be/')[1]?.split('?')[0]
+      if (videoId) embedUrl = `https://www.youtube.com/embed/${videoId}`
+    }
+    return (
+      <div className="aspect-video rounded-lg overflow-hidden bg-black">
+        <iframe
+          src={embedUrl}
+          className="w-full h-full"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          title={title}
+        />
+      </div>
+    )
+  }
+
+  // Direct MP4 / file URL — use native <video>
+  return (
+    <div className="rounded-lg overflow-hidden bg-black">
+      <video
+        controls
+        className="w-full"
+        style={{ maxHeight: '480px' }}
+        preload="metadata"
+      >
+        <source src={url} type="video/mp4" />
+        Your browser does not support the video tag.
+      </video>
+    </div>
+  )
+}
+
 function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -137,15 +180,7 @@ export function ModulePage() {
             }
           >
             {content.video_url ? (
-              <div className="aspect-video rounded-lg overflow-hidden bg-black">
-                <iframe
-                  src={content.video_url}
-                  className="w-full h-full"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  title={module.title}
-                />
-              </div>
+              <VideoPlayer url={content.video_url} title={module.title} />
             ) : (
               <div className="aspect-video rounded-lg bg-gray-100 flex items-center justify-center">
                 <div className="text-center text-gray-400">
@@ -260,8 +295,8 @@ export function ModulePage() {
             </Section>
           )}
 
-          {/* 5. Record — exec.com prompt */}
-          {content.exec_prompt && (
+          {/* 5. Record — exec.com */}
+          {(content.exec_prompt || content.exec_url) && (
             <Section
               title="Record — Practice with exec.com"
               icon={
@@ -270,23 +305,41 @@ export function ModulePage() {
                 </svg>
               }
             >
-              <p className="text-sm text-gray-600 mb-4">
-                Use this prompt to practice your delivery on exec.com — an AI-powered pitch practice platform.
-              </p>
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
-                <p className="text-sm text-gray-700 leading-relaxed font-mono whitespace-pre-wrap">{content.exec_prompt}</p>
-              </div>
-              <a
-                href="https://exec.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 bg-pendo-navy text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-pendo-navy-light transition-colors"
-              >
-                Open exec.com
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-              </a>
+              {/* Prompt / instructions always shown if present */}
+              {content.exec_prompt && (
+                <div className="mb-5">
+                  <p className="text-sm font-medium text-pendo-navy mb-2">Your practice prompt:</p>
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                    <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{content.exec_prompt}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Embedded exec.com session */}
+              {content.exec_url ? (
+                <div className="rounded-xl overflow-hidden border border-gray-200 shadow-sm" style={{ height: '640px' }}>
+                  <iframe
+                    src={content.exec_url}
+                    className="w-full h-full"
+                    allow="camera; microphone; fullscreen; autoplay; clipboard-write"
+                    allowFullScreen
+                    title={`exec.com practice — ${module.title}`}
+                    sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
+                  />
+                </div>
+              ) : (
+                <a
+                  href="https://exec.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 bg-pendo-navy text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-opacity-90 transition-colors"
+                >
+                  Open exec.com
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </a>
+              )}
             </Section>
           )}
         </div>

@@ -32,11 +32,12 @@ export interface ModuleScenario {
 export interface ModuleContent {
   synopsis?: string
   why_it_matters?: string
-  video_url?: string
+  video_url?: string | null
   docs?: ModuleDoc[]
   scenario?: ModuleScenario
   recordings?: ModuleRecording[]
   exec_prompt?: string
+  exec_url?: string | null   // iframe URL for an embedded exec.com session
 }
 
 export interface LmsModule {
