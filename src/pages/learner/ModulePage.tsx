@@ -13,7 +13,7 @@ function isEmbeddable(url: string): boolean {
 }
 
 // Detects whether a URL is an embeddable video or a link-only source
-function VideoPlayer({ url, title, onOpenModal }: { url: string; title: string; onOpenModal: (url: string, title: string) => void }) {
+function VideoPlayer({ url, title, onOpenModal: _onOpenModal }: { url: string; title: string; onOpenModal: (url: string, title: string) => void }) {
   const isLoom = /loom\.com/i.test(url)
   const isYouTube = /youtube\.com|youtu\.be/i.test(url)
   const isVimeo = /vimeo\.com/i.test(url)
