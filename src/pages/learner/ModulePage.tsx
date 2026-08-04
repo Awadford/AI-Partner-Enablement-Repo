@@ -211,6 +211,21 @@ export function ModulePage() {
   const content = module.content ?? {}
   const docs: ModuleDoc[] = content.docs ?? []
   const recordings: ModuleRecording[] = content.recordings ?? []
+  const iframeUrl = content.iframe_url
+  const overrides = content.iframe_overrides ?? {}
+
+  // Renders the Academy/iframe embed used when a section is overridden
+  const IframeEmbed = ({ title }: { title: string }) => (
+    <div className="rounded-lg overflow-hidden border border-gray-200" style={{ height: '560px' }}>
+      <iframe
+        src={iframeUrl!}
+        title={title}
+        className="w-full h-full"
+        allow="fullscreen; autoplay"
+        allowFullScreen
+      />
+    </div>
+  )
 
   return (
     <Layout>
@@ -263,7 +278,9 @@ export function ModulePage() {
               </svg>
             }
           >
-            {content.video_url ? (
+            {iframeUrl && overrides.video ? (
+              <IframeEmbed title={`${module.title} — Academy Course`} />
+            ) : content.video_url ? (
               content.video_url_extension ? (
                 // Two install paths — tabbed
                 <VideoTabs
@@ -287,7 +304,7 @@ export function ModulePage() {
           </Section>
 
           {/* 2. Resources */}
-          {docs.length > 0 && (
+          {(docs.length > 0 || (iframeUrl && overrides.resources)) && (
             <Section
               title="Resources"
               icon={
@@ -296,6 +313,9 @@ export function ModulePage() {
                 </svg>
               }
             >
+              {iframeUrl && overrides.resources ? (
+                <IframeEmbed title={`${module.title} — Resources`} />
+              ) : (<>
               <button
                 onClick={() => setDocsOpen(o => !o)}
                 className="flex items-center gap-2 text-sm text-gray-600 hover:text-pendo-navy mb-3 transition-colors"
@@ -322,6 +342,7 @@ export function ModulePage() {
                   ))}
                 </ul>
               )}
+              </>)}
             </Section>
           )}
 
@@ -352,7 +373,7 @@ export function ModulePage() {
           )}
 
           {/* 4. Watch — Customer Recordings */}
-          {recordings.length > 0 && (
+          {(recordings.length > 0 || (iframeUrl && overrides.recordings)) && (
             <Section
               title="Watch — Customer Recordings"
               icon={
@@ -361,6 +382,9 @@ export function ModulePage() {
                 </svg>
               }
             >
+              {iframeUrl && overrides.recordings ? (
+                <IframeEmbed title={`${module.title} — Recordings`} />
+              ) : (
               <ul className="space-y-3">
                 {recordings.map((rec, i) => (
                   <li key={i}>
@@ -381,11 +405,12 @@ export function ModulePage() {
                   </li>
                 ))}
               </ul>
+              )}
             </Section>
           )}
 
           {/* 5. Record — exec.com */}
-          {(content.exec_prompt || content.exec_url) && (
+          {(content.exec_prompt || content.exec_url || (iframeUrl && overrides.exec)) && (
             <Section
               title="Record — Practice with exec.com"
               icon={
@@ -394,6 +419,9 @@ export function ModulePage() {
                 </svg>
               }
             >
+              {iframeUrl && overrides.exec ? (
+                <IframeEmbed title={`${module.title} — Practice`} />
+              ) : (<>
               {/* Prompt / instructions always shown if present */}
               {content.exec_prompt && (
                 <div className="mb-5">
@@ -414,6 +442,7 @@ export function ModulePage() {
                 </svg>
                 Open exec.com
               </button>
+              </>)}
             </Section>
           )}
         </div>

@@ -29,6 +29,13 @@ export interface ModuleScenario {
   description: string
 }
 
+export interface IframeOverrides {
+  video?: boolean
+  resources?: boolean
+  recordings?: boolean
+  exec?: boolean
+}
+
 export interface ModuleContent {
   synopsis?: string
   why_it_matters?: string
@@ -38,7 +45,9 @@ export interface ModuleContent {
   scenario?: ModuleScenario
   recordings?: ModuleRecording[]
   exec_prompt?: string
-  exec_url?: string | null   // iframe URL for an embedded exec.com session
+  exec_url?: string | null
+  iframe_url?: string | null       // Academy/external course to embed
+  iframe_overrides?: IframeOverrides  // which sections the iframe replaces
 }
 
 export interface LmsModule {

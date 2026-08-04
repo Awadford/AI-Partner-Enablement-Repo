@@ -5,6 +5,13 @@ import { LmsModule } from '../../types'
 
 interface DocItem { title: string; url: string }
 
+interface IframeOverrides {
+  video: boolean
+  resources: boolean
+  recordings: boolean
+  exec: boolean
+}
+
 interface EditState {
   video_url: string
   video_url_extension: string
@@ -12,6 +19,8 @@ interface EditState {
   recordings: DocItem[]
   exec_url: string
   exec_prompt: string
+  iframe_url: string
+  iframe_overrides: IframeOverrides
 }
 
 export function AdminModules() {
@@ -19,7 +28,7 @@ export function AdminModules() {
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
-  const [editState, setEditState] = useState<EditState>({ video_url: '', video_url_extension: '', docs: [], recordings: [], exec_url: '', exec_prompt: '' })
+  const [editState, setEditState] = useState<EditState>({ video_url: '', video_url_extension: '', docs: [], recordings: [], exec_url: '', exec_prompt: '', iframe_url: '', iframe_overrides: { video: false, resources: false, recordings: false, exec: false } })
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState<string | null>(null)
 
@@ -44,6 +53,13 @@ export function AdminModules() {
       recordings: mod.content?.recordings?.map((r: DocItem) => ({ ...r })) ?? [],
       exec_url: mod.content?.exec_url ?? '',
       exec_prompt: mod.content?.exec_prompt ?? '',
+      iframe_url: mod.content?.iframe_url ?? '',
+      iframe_overrides: {
+        video: mod.content?.iframe_overrides?.video ?? false,
+        resources: mod.content?.iframe_overrides?.resources ?? false,
+        recordings: mod.content?.iframe_overrides?.recordings ?? false,
+        exec: mod.content?.iframe_overrides?.exec ?? false,
+      },
     })
   }
 
@@ -57,6 +73,8 @@ export function AdminModules() {
       recordings: editState.recordings.filter(r => r.title || r.url),
       exec_url: editState.exec_url || null,
       exec_prompt: editState.exec_prompt || undefined,
+      iframe_url: editState.iframe_url || null,
+      iframe_overrides: editState.iframe_url ? editState.iframe_overrides : undefined,
     }
     const { error } = await supabase
       .from('lms_modules')
@@ -263,6 +281,42 @@ export function AdminModules() {
                                   </button>
                                 </div>
                               ))}
+                            </div>
+                          </div>
+
+                          {/* Academy / Iframe Override */}
+                          <div>
+                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Academy / Iframe Override</p>
+                            <p className="text-xs text-gray-400 mb-2">Add an Academy course URL to replace any section with an embedded iframe.</p>
+                            <div className="space-y-3">
+                              <div>
+                                <label className="block text-xs text-gray-500 mb-1">Iframe URL</label>
+                                <input type="text" value={editState.iframe_url}
+                                  onChange={e => setEditState(s => ({ ...s, iframe_url: e.target.value }))}
+                                  placeholder="https://academy.pendo.io/…"
+                                  className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-pendo-pink" />
+                              </div>
+                              {editState.iframe_url && (
+                                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
+                                  <p className="text-xs font-semibold text-amber-800 mb-1">Override sections with this iframe:</p>
+                                  {([
+                                    { key: 'video', label: 'Overview Video' },
+                                    { key: 'resources', label: 'Resources' },
+                                    { key: 'recordings', label: 'Customer Recordings' },
+                                    { key: 'exec', label: 'exec.com Practice' },
+                                  ] as const).map(({ key, label }) => (
+                                    <label key={key} className="flex items-center gap-2.5 cursor-pointer select-none">
+                                      <div
+                                        onClick={() => setEditState(s => ({ ...s, iframe_overrides: { ...s.iframe_overrides, [key]: !s.iframe_overrides[key] } }))}
+                                        className={`w-9 h-5 rounded-full transition-colors flex-shrink-0 relative ${editState.iframe_overrides[key] ? 'bg-pendo-pink' : 'bg-gray-300'}`}
+                                      >
+                                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${editState.iframe_overrides[key] ? 'translate-x-4' : ''}`} />
+                                      </div>
+                                      <span className="text-xs text-gray-700">{label}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </div>
 
