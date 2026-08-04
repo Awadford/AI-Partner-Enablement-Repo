@@ -5,6 +5,7 @@ import { useProgress } from '../../hooks/useProgress'
 import { supabase } from '../../lib/supabase'
 import { Layout } from '../../components/Layout'
 import { LinkModal } from '../../components/LinkModal'
+import { openPopup } from '../../lib/openPopup'
 import { LmsModule, ModuleDoc, ModuleRecording } from '../../types'
 
 // Detects whether a URL is an embeddable video or a link-only source
@@ -403,7 +404,7 @@ export function ModulePage() {
 
               {/* Open exec.com as full-screen modal */}
               <button
-                onClick={() => { setExecModalOpen(true); setExecAttempted(true) }}
+                onClick={() => { openPopup(content.exec_url!, 'Practice with exec.com'); setExecAttempted(true) }}
                 className="inline-flex items-center gap-2 bg-pendo-navy text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-opacity-90 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -468,38 +469,6 @@ export function ModulePage() {
         </div>
       </div>
 
-      {/* exec.com full-screen modal */}
-      {execModalOpen && (content.exec_url || module) && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-black bg-opacity-80">
-          {/* Thin header bar */}
-          <div className="flex items-center justify-between px-4 py-2 bg-pendo-navy flex-shrink-0">
-            <div className="flex items-center gap-2">
-              <svg className="w-4 h-4 text-white opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-              </svg>
-              <span className="text-white text-sm font-medium">Practice with exec.com</span>
-            </div>
-            <button
-              onClick={() => setExecModalOpen(false)}
-              className="text-white text-opacity-70 hover:text-opacity-100 transition-colors flex items-center gap-1.5 text-sm"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              Close
-            </button>
-          </div>
-          {/* Full iframe */}
-          <iframe
-            src={content.exec_url || 'https://exec.com'}
-            className="flex-1 w-full border-0"
-            allow="camera; microphone; fullscreen; autoplay; clipboard-write; display-capture"
-            allowFullScreen
-            title={`exec.com practice — ${module.title}`}
-            sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads"
-          />
-        </div>
-      )}
 
       {/* Link modal */}
       {modalLink && (
