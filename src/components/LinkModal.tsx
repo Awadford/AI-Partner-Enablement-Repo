@@ -81,21 +81,27 @@ export function LinkModal({ url, title, onClose }: LinkModalProps) {
               {getSourceIcon(url)}
             </div>
             <div className="text-center">
-              <p className="text-gray-600 text-sm max-w-sm">
-                This {getSourceLabel(url).toLowerCase()} will open in a new tab.
+              <p className="text-pendo-navy font-semibold mb-1">{title}</p>
+              <p className="text-gray-500 text-sm max-w-sm">
+                {getSourceLabel(url)} recordings can't be embedded — click below to open in a floating player window.
               </p>
             </div>
-            <a
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              onClick={() => {
+                const w = 1100
+                const h = 700
+                const left = window.screenX + (window.outerWidth - w) / 2
+                const top = window.screenY + (window.outerHeight - h) / 2
+                window.open(url, '_blank', `width=${w},height=${h},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes,resizable=yes`)
+                onClose()
+              }}
               className="inline-flex items-center gap-2 px-6 py-3 bg-pendo-pink text-white font-semibold rounded-xl hover:bg-opacity-90 transition-colors"
             >
-              Open {getSourceLabel(url)}
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-            </a>
+              Watch {getSourceLabel(url)}
+            </button>
           </div>
         )}
       </div>
