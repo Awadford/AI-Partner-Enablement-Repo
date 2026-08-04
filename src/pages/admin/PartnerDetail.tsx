@@ -3,7 +3,6 @@ import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { Layout } from '../../components/Layout'
 import { Partner, LmsModule, LmsPartnerModule, LmsPartnerDomain, LmsProfile, LmsUserProgress, LmsCertification, LmsUserCertification } from '../../types'
-import { openPopup } from '../../lib/openPopup'
 
 interface ModuleRow extends LmsModule {
   pm: LmsPartnerModule | null
@@ -363,7 +362,7 @@ export function AdminPartnerDetail() {
                   ${cert.enabled ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 opacity-60'}`}>
                   <div className="flex-1 min-w-0">
                     <button
-                      onClick={() => openPopup(cert.url, cert.title)}
+                      onClick={() => window.open(cert.url, '_blank')}
                       className="text-sm font-medium text-pendo-navy hover:text-pendo-pink transition-colors text-left"
                     >
                       {cert.title} ↗

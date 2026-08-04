@@ -1,5 +1,4 @@
 import { useEffect } from 'react'
-import { openPopup } from '../lib/openPopup'
 
 interface LinkModalProps {
   url: string
@@ -88,7 +87,7 @@ export function LinkModal({ url, title, onClose }: LinkModalProps) {
               </p>
             </div>
             <button
-              onClick={() => { openPopup(url, title); onClose() }}
+              onClick={() => { window.open(url, '_blank'); onClose() }}
               className="inline-flex items-center gap-2 px-6 py-3 bg-pendo-pink text-white font-semibold rounded-xl hover:bg-opacity-90 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

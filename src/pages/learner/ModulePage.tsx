@@ -5,8 +5,12 @@ import { useProgress } from '../../hooks/useProgress'
 import { supabase } from '../../lib/supabase'
 import { Layout } from '../../components/Layout'
 import { LinkModal } from '../../components/LinkModal'
-import { openPopup } from '../../lib/openPopup'
 import { LmsModule, ModuleDoc, ModuleRecording } from '../../types'
+
+/** Returns true for content we can embed in an in-app iframe */
+function isEmbeddable(url: string): boolean {
+  return /loom\.com|youtube\.com|youtu\.be|vimeo\.com|wistia\.com/i.test(url)
+}
 
 // Detects whether a URL is an embeddable video or a link-only source
 function VideoPlayer({ url, title, onOpenModal }: { url: string; title: string; onOpenModal: (url: string, title: string) => void }) {
@@ -16,19 +20,19 @@ function VideoPlayer({ url, title, onOpenModal }: { url: string; title: string; 
   const isWistia = /wistia\.com/i.test(url)
   const isLinkOnly = /zoom\.us|pendo\.zoom|gong\.io/i.test(url)
 
-  // Non-embeddable sources — show a launch button instead
+  // Non-embeddable sources — open directly in new tab
   if (isLinkOnly) {
     const label = /gong\.io/i.test(url) ? 'Gong Recording' : 'Zoom Recording'
     const icon = /gong\.io/i.test(url) ? '📊' : '📹'
     return (
       <button
-        onClick={() => onOpenModal(url, title)}
+        onClick={() => window.open(url, '_blank')}
         className="w-full flex items-center gap-4 p-5 rounded-xl border-2 border-dashed border-gray-200 hover:border-pendo-pink hover:bg-pink-50 transition-all group"
       >
         <span className="text-3xl">{icon}</span>
         <div className="text-left">
           <p className="font-semibold text-pendo-navy group-hover:text-pendo-pink transition-colors">{label}</p>
-          <p className="text-sm text-gray-500 mt-0.5">Click to open in viewer</p>
+          <p className="text-sm text-gray-500 mt-0.5">Click to open in new tab</p>
         </div>
         <svg className="w-5 h-5 text-gray-400 group-hover:text-pendo-pink ml-auto transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -131,7 +135,6 @@ export function ModulePage() {
   const [docsOpen, setDocsOpen] = useState(true)
   const [markedComplete, setMarkedComplete] = useState(false)
   const [modalLink, setModalLink] = useState<{ url: string; title: string } | null>(null)
-  const [execModalOpen, setExecModalOpen] = useState(false)
   const [execAttempted, setExecAttempted] = useState(false)
 
   useEffect(() => {
@@ -161,7 +164,7 @@ export function ModulePage() {
   // Listen for exec.com postMessage completion events
   useEffect(() => {
     const handleMessage = async (e: MessageEvent) => {
-      if (!execModalOpen) return
+      if (!execAttempted) return
       const data = e.data
       // exec.com / common scenario platform completion signals
       const isComplete =
@@ -172,7 +175,6 @@ export function ModulePage() {
         data?.status === 'passed' ||
         data?.status === 'completed'
       if (isComplete && moduleId) {
-        setExecModalOpen(false)
         setCompleting(true)
         const ok = await markComplete(moduleId)
         if (ok) setMarkedComplete(true)
@@ -181,7 +183,7 @@ export function ModulePage() {
     }
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
-  }, [execModalOpen, moduleId])
+  }, [execAttempted, moduleId])
 
   const currentStatus = moduleId ? progress[moduleId]?.status ?? 'not_started' : 'not_started'
   const isCompleted = currentStatus === 'completed' || markedComplete
@@ -308,7 +310,7 @@ export function ModulePage() {
                   {docs.map((doc, i) => (
                     <li key={i}>
                       <button
-                        onClick={() => setModalLink({ url: doc.url, title: doc.title })}
+                        onClick={() => isEmbeddable(doc.url) ? setModalLink({ url: doc.url, title: doc.title }) : window.open(doc.url, '_blank')}
                         className="flex items-center gap-2 text-sm text-pendo-pink hover:text-pendo-pink-dark hover:underline transition-colors text-left"
                       >
                         <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -363,7 +365,7 @@ export function ModulePage() {
                 {recordings.map((rec, i) => (
                   <li key={i}>
                     <button
-                      onClick={() => setModalLink({ url: rec.url, title: rec.title })}
+                      onClick={() => isEmbeddable(rec.url) ? setModalLink({ url: rec.url, title: rec.title }) : window.open(rec.url, '_blank')}
                       className="w-full flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-pendo-pink hover:bg-pendo-pink hover:bg-opacity-5 transition-all group text-left"
                     >
                       <div className="w-8 h-8 rounded-lg bg-pendo-pink bg-opacity-10 flex items-center justify-center text-pendo-pink flex-shrink-0">
@@ -404,7 +406,7 @@ export function ModulePage() {
 
               {/* Open exec.com as full-screen modal */}
               <button
-                onClick={() => { openPopup(content.exec_url!, 'Practice with exec.com'); setExecAttempted(true) }}
+                onClick={() => { window.open(content.exec_url!, '_blank'); setExecAttempted(true) }}
                 className="inline-flex items-center gap-2 bg-pendo-navy text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-opacity-90 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

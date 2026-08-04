@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { openPopup } from '../lib/openPopup'
 
 const SLACK_PENDO_BRAIN_URL = 'https://pendo-internal.slack.com/app_redirect?app=pendo-brain'
 
@@ -71,7 +70,7 @@ export function PendoBrainWidget() {
               ].map(q => (
                 <button
                   key={q}
-                  onClick={() => openPopup(SLACK_PENDO_BRAIN_URL, 'Pendo Brain')}
+                  onClick={() => window.open(SLACK_PENDO_BRAIN_URL, '_blank')}
                   className="block w-full text-left text-xs text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 transition-colors"
                 >
                   "{q}"
@@ -79,7 +78,7 @@ export function PendoBrainWidget() {
               ))}
             </div>
             <button
-              onClick={() => openPopup(SLACK_PENDO_BRAIN_URL, 'Pendo Brain')}
+              onClick={() => window.open(SLACK_PENDO_BRAIN_URL, '_blank')}
               className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-white text-sm font-semibold transition-colors"
               style={{ background: 'linear-gradient(135deg, #e8185a 0%, #c01348 100%)' }}
             >
