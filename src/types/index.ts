@@ -29,6 +29,31 @@ export interface ModuleScenario {
   description: string
 }
 
+export interface StepGuideStep {
+  title: string
+  description: string
+  badge?: string
+}
+
+export interface StepGuideTab {
+  id: string
+  label: string
+  overview?: string
+  steps: StepGuideStep[]
+  tip?: string
+  note?: string
+}
+
+export interface StepGuideFaq {
+  question: string
+  answer: string
+}
+
+export interface StepGuide {
+  tabs: StepGuideTab[]
+  faqs?: StepGuideFaq[]
+}
+
 export interface IframeOverrides {
   video?: boolean
   resources?: boolean
@@ -46,6 +71,7 @@ export interface ModuleContent {
   recordings?: ModuleRecording[]
   exec_prompt?: string
   exec_url?: string | null
+  step_guide?: StepGuide | null
   iframe_url?: string | null       // Academy/external course to embed
   iframe_overrides?: IframeOverrides  // which sections the iframe replaces
 }
