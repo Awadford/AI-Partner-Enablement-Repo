@@ -1,6 +1,7 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
+import { PendoBrainWidget } from './PendoBrainWidget'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -108,6 +109,9 @@ export function Layout({ children }: LayoutProps) {
       <main className="flex-1">
         {children}
       </main>
+
+      {/* Pendo Brain floating widget */}
+      <PendoBrainWidget />
     </div>
   )
 }

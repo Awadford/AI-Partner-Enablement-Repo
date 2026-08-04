@@ -33,6 +33,7 @@ export interface ModuleContent {
   synopsis?: string
   why_it_matters?: string
   video_url?: string | null
+  video_url_extension?: string | null
   docs?: ModuleDoc[]
   scenario?: ModuleScenario
   recordings?: ModuleRecording[]
@@ -65,10 +66,18 @@ export interface LmsProfile {
   id: string
   email: string
   full_name: string | null
+  title: string | null
   partner_id: string | null
   is_admin: boolean
   created_at: string
   updated_at: string
+}
+
+export interface LmsUserCertification {
+  id: string
+  user_id: string
+  certification_id: string
+  completed_at: string
 }
 
 export type ProgressStatus = 'not_started' | 'in_progress' | 'completed'
@@ -82,6 +91,29 @@ export interface LmsUserProgress {
   completed_at: string | null
   created_at: string
   updated_at: string
+}
+
+export interface LmsCertification {
+  id: string
+  slug: string
+  title: string
+  description: string | null
+  url: string
+  order_index: number
+  created_at: string
+}
+
+export interface LmsPartnerCertification {
+  id: string
+  partner_id: string
+  certification_id: string
+  enabled: boolean
+  created_at: string
+}
+
+export interface CertificationWithStatus extends LmsCertification {
+  enabled: boolean
+  partner_certification_id: string
 }
 
 // Composed types for UI

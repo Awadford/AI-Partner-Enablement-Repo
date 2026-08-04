@@ -31,7 +31,8 @@ export function useAuth(): AuthState {
 
     // Profile doesn't exist — create one
     const email = u.email ?? ''
-    const isAdmin = email === 'andrew.wadford@pendo.io'
+    const ADMIN_EMAILS = ['andrew.wadford@pendo.io', 'gabrielle.vacca@pendo.io']
+    const isAdmin = ADMIN_EMAILS.includes(email)
 
     // Find partner by email domain
     let partnerId: string | null = null
@@ -51,6 +52,7 @@ export function useAuth(): AuthState {
       id: u.id,
       email,
       full_name: u.user_metadata?.full_name ?? null,
+      title: null,
       partner_id: partnerId,
       is_admin: isAdmin,
     }
@@ -62,6 +64,15 @@ export function useAuth(): AuthState {
       .single()
 
     if (createError) {
+      // Row may already exist (e.g. manually inserted) — re-fetch it
+      if (createError.code === '23505') {
+        const { data: refetched } = await supabase
+          .from('lms_profiles')
+          .select('*')
+          .eq('id', u.id)
+          .single()
+        return refetched as LmsProfile | null
+      }
       console.error('Error creating profile:', createError)
       return null
     }

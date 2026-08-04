@@ -5,7 +5,8 @@ import { supabase } from '../../lib/supabase'
 import { Layout } from '../../components/Layout'
 import { ModuleCard } from '../../components/ModuleCard'
 import { ProgressBar } from '../../components/ProgressBar'
-import { Partner, LmsModule, LmsPartnerModule, ModuleWithProgress } from '../../types'
+import { Partner, LmsModule, LmsPartnerModule, ModuleWithProgress, LmsCertification } from '../../types'
+import { LinkModal } from '../../components/LinkModal'
 
 export function LearnerDashboard() {
   const { profile } = useAuth()
@@ -13,7 +14,9 @@ export function LearnerDashboard() {
 
   const [partner, setPartner] = useState<Partner | null>(null)
   const [modules, setModules] = useState<ModuleWithProgress[]>([])
+  const [certifications, setCertifications] = useState<LmsCertification[]>([])
   const [loading, setLoading] = useState(true)
+  const [modalLink, setModalLink] = useState<{ url: string; title: string } | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -30,6 +33,22 @@ export function LearnerDashboard() {
         .single()
       setPartner(partnerData as Partner)
 
+      // Load enabled certifications for this partner
+      const { data: certRows } = await supabase
+        .from('lms_partner_certifications')
+        .select('*, lms_certifications(*)')
+        .eq('partner_id', profile.partner_id)
+        .eq('enabled', true)
+        .order('lms_certifications(order_index)', { ascending: true })
+
+      if (certRows) {
+        setCertifications(
+          certRows
+            .filter((r: any) => r.lms_certifications)
+            .map((r: any) => r.lms_certifications as LmsCertification)
+        )
+      }
+
       // Load enabled modules for this partner
       const { data: pmRows } = await supabase
         .from('lms_partner_modules')
@@ -45,7 +64,7 @@ export function LearnerDashboard() {
             const mod = row.lms_modules
             const prog = progress[mod.id]
             const status = prog?.status ?? 'not_started'
-            const locked = idx > 0 && (progress[pmRows[idx - 1].module_id]?.status !== 'completed')
+            const locked = !profile?.is_admin && idx > 0 && (progress[pmRows[idx - 1].module_id]?.status !== 'completed')
             return {
               ...mod,
               order_index: row.order_index,
@@ -99,9 +118,50 @@ export function LearnerDashboard() {
           </div>
           <h1 className="text-3xl font-bold text-pendo-navy">{partner?.name ?? 'Your Portal'}</h1>
           <p className="text-gray-500 mt-1">
-            Welcome back{profile.full_name ? `, ${profile.full_name}` : ''}. Continue your enablement journey below.
+            Welcome back{profile.full_name ? `, ${profile.full_name}` : ''}. Complete your certifications first, then work through the enablement modules below.
           </p>
         </div>
+
+        {/* Certifications */}
+        {certifications.length > 0 && (
+          <div className="mb-8">
+            <h2 className="font-semibold text-pendo-navy mb-1">Certifications</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              Complete these before starting enablement. All certifications are free — use code{' '}
+              <span className="font-mono font-semibold text-pendo-pink bg-pink-50 px-1.5 py-0.5 rounded">pendopartners</span>{' '}
+              at checkout for 100% off.
+            </p>
+            <div className="space-y-3">
+              {certifications.map((cert, idx) => (
+                <button
+                  key={cert.id}
+                  onClick={() => setModalLink({ url: cert.url, title: cert.title })}
+                  className="w-full flex items-start gap-4 bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:border-pendo-pink hover:shadow-md transition-all group text-left"
+                >
+                  <div className="w-8 h-8 rounded-full bg-pendo-navy bg-opacity-10 flex items-center justify-center text-pendo-navy text-sm font-semibold flex-shrink-0 mt-0.5">
+                    {idx + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-pendo-navy group-hover:text-pendo-pink transition-colors">{cert.title}</h3>
+                      <svg className="w-3.5 h-3.5 text-gray-400 group-hover:text-pendo-pink transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </div>
+                    {cert.description && (
+                      <p className="text-sm text-gray-500 mt-0.5">{cert.description}</p>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Link modal */}
+        {modalLink && (
+          <LinkModal url={modalLink.url} title={modalLink.title} onClose={() => setModalLink(null)} />
+        )}
 
         {/* Progress overview */}
         {modules.length > 0 && (
@@ -124,7 +184,7 @@ export function LearnerDashboard() {
 
         {/* Module list */}
         <div>
-          <h2 className="font-semibold text-pendo-navy mb-4">Learning Path</h2>
+          <h2 className="font-semibold text-pendo-navy mb-4">Enablement Modules</h2>
           {modules.length === 0 ? (
             <div className="text-center py-12 text-gray-500 bg-white rounded-xl border border-gray-200">
               No modules have been assigned to your partner yet.

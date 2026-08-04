@@ -4,21 +4,51 @@ import { useAuth } from '../../hooks/useAuth'
 import { useProgress } from '../../hooks/useProgress'
 import { supabase } from '../../lib/supabase'
 import { Layout } from '../../components/Layout'
+import { LinkModal } from '../../components/LinkModal'
 import { LmsModule, ModuleDoc, ModuleRecording } from '../../types'
 
-// Detects whether a URL is a direct video file or an embed (YouTube/Vimeo/Loom)
-function VideoPlayer({ url, title }: { url: string; title: string }) {
-  const isEmbed = /youtube\.com|youtu\.be|vimeo\.com|loom\.com|wistia\.com/i.test(url)
+// Detects whether a URL is an embeddable video or a link-only source
+function VideoPlayer({ url, title, onOpenModal }: { url: string; title: string; onOpenModal: (url: string, title: string) => void }) {
+  const isLoom = /loom\.com/i.test(url)
+  const isYouTube = /youtube\.com|youtu\.be/i.test(url)
+  const isVimeo = /vimeo\.com/i.test(url)
+  const isWistia = /wistia\.com/i.test(url)
+  const isLinkOnly = /zoom\.us|pendo\.zoom|gong\.io/i.test(url)
 
-  if (isEmbed) {
-    // For YouTube, convert watch URL to embed URL
+  // Non-embeddable sources — show a launch button instead
+  if (isLinkOnly) {
+    const label = /gong\.io/i.test(url) ? 'Gong Recording' : 'Zoom Recording'
+    const icon = /gong\.io/i.test(url) ? '📊' : '📹'
+    return (
+      <button
+        onClick={() => onOpenModal(url, title)}
+        className="w-full flex items-center gap-4 p-5 rounded-xl border-2 border-dashed border-gray-200 hover:border-pendo-pink hover:bg-pink-50 transition-all group"
+      >
+        <span className="text-3xl">{icon}</span>
+        <div className="text-left">
+          <p className="font-semibold text-pendo-navy group-hover:text-pendo-pink transition-colors">{label}</p>
+          <p className="text-sm text-gray-500 mt-0.5">Click to open in viewer</p>
+        </div>
+        <svg className="w-5 h-5 text-gray-400 group-hover:text-pendo-pink ml-auto transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+        </svg>
+      </button>
+    )
+  }
+
+  if (isLoom || isYouTube || isVimeo || isWistia) {
     let embedUrl = url
-    if (url.includes('youtube.com/watch')) {
-      const videoId = new URL(url).searchParams.get('v')
-      if (videoId) embedUrl = `https://www.youtube.com/embed/${videoId}`
-    } else if (url.includes('youtu.be/')) {
-      const videoId = url.split('youtu.be/')[1]?.split('?')[0]
-      if (videoId) embedUrl = `https://www.youtube.com/embed/${videoId}`
+    if (isYouTube) {
+      if (url.includes('youtube.com/watch')) {
+        const videoId = new URL(url).searchParams.get('v')
+        if (videoId) embedUrl = `https://www.youtube.com/embed/${videoId}`
+      } else if (url.includes('youtu.be/')) {
+        const videoId = url.split('youtu.be/')[1]?.split('?')[0]
+        if (videoId) embedUrl = `https://www.youtube.com/embed/${videoId}`
+      }
+    } else if (isLoom) {
+      const match = url.match(/loom\.com\/share\/([a-zA-Z0-9]+)/)
+      if (match) embedUrl = `https://www.loom.com/embed/${match[1]}`
     }
     return (
       <div className="aspect-video rounded-lg overflow-hidden bg-black">
@@ -33,18 +63,41 @@ function VideoPlayer({ url, title }: { url: string; title: string }) {
     )
   }
 
-  // Direct MP4 / file URL — use native <video>
+  // Direct MP4 / file URL — use native <video> with src directly on element (not <source>) so React remounts reliably
   return (
     <div className="rounded-lg overflow-hidden bg-black">
-      <video
-        controls
-        className="w-full"
-        style={{ maxHeight: '480px' }}
-        preload="metadata"
-      >
-        <source src={url} type="video/mp4" />
-        Your browser does not support the video tag.
-      </video>
+      <video key={url} src={url} controls className="w-full" style={{ maxHeight: '480px' }} preload="metadata" />
+    </div>
+  )
+}
+
+function VideoTabs({
+  snippet, extension, onOpenModal
+}: {
+  snippet: { url: string; title: string }
+  extension: { url: string; title: string }
+  onOpenModal: (url: string, title: string) => void
+}) {
+  const [active, setActive] = useState<'snippet' | 'extension'>('snippet')
+  const current = active === 'snippet' ? snippet : extension
+  return (
+    <div>
+      <div className="flex gap-1 mb-3 bg-gray-100 p-1 rounded-lg w-fit">
+        {(['snippet', 'extension'] as const).map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActive(tab)}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              active === tab
+                ? 'bg-white text-pendo-navy shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {tab === 'snippet' ? '1st Party Snippet' : 'Browser Extension'}
+          </button>
+        ))}
+      </div>
+      <VideoPlayer key={current.url} url={current.url} title={current.title} onOpenModal={onOpenModal} />
     </div>
   )
 }
@@ -76,6 +129,9 @@ export function ModulePage() {
   const [completing, setCompleting] = useState(false)
   const [docsOpen, setDocsOpen] = useState(true)
   const [markedComplete, setMarkedComplete] = useState(false)
+  const [modalLink, setModalLink] = useState<{ url: string; title: string } | null>(null)
+  const [execModalOpen, setExecModalOpen] = useState(false)
+  const [execAttempted, setExecAttempted] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -100,6 +156,31 @@ export function ModulePage() {
     }
     load()
   }, [moduleId, profile?.id])
+
+  // Listen for exec.com postMessage completion events
+  useEffect(() => {
+    const handleMessage = async (e: MessageEvent) => {
+      if (!execModalOpen) return
+      const data = e.data
+      // exec.com / common scenario platform completion signals
+      const isComplete =
+        data?.type === 'scenario_complete' ||
+        data?.type === 'session_complete' ||
+        data?.type === 'roleplay_complete' ||
+        data?.event === 'complete' ||
+        data?.status === 'passed' ||
+        data?.status === 'completed'
+      if (isComplete && moduleId) {
+        setExecModalOpen(false)
+        setCompleting(true)
+        const ok = await markComplete(moduleId)
+        if (ok) setMarkedComplete(true)
+        setCompleting(false)
+      }
+    }
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
+  }, [execModalOpen, moduleId])
 
   const currentStatus = moduleId ? progress[moduleId]?.status ?? 'not_started' : 'not_started'
   const isCompleted = currentStatus === 'completed' || markedComplete
@@ -180,7 +261,16 @@ export function ModulePage() {
             }
           >
             {content.video_url ? (
-              <VideoPlayer url={content.video_url} title={module.title} />
+              content.video_url_extension ? (
+                // Two install paths — tabbed
+                <VideoTabs
+                  snippet={{ url: content.video_url, title: 'Snippet Install' }}
+                  extension={{ url: content.video_url_extension, title: 'Extension Install' }}
+                  onOpenModal={(url, t) => setModalLink({ url, title: t })}
+                />
+              ) : (
+                <VideoPlayer url={content.video_url} title={module.title} onOpenModal={(url, t) => setModalLink({ url, title: t })} />
+              )
             ) : (
               <div className="aspect-video rounded-lg bg-gray-100 flex items-center justify-center">
                 <div className="text-center text-gray-400">
@@ -216,17 +306,15 @@ export function ModulePage() {
                 <ul className="space-y-2">
                   {docs.map((doc, i) => (
                     <li key={i}>
-                      <a
-                        href={doc.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-sm text-pendo-pink hover:text-pendo-pink-dark hover:underline transition-colors"
+                      <button
+                        onClick={() => setModalLink({ url: doc.url, title: doc.title })}
+                        className="flex items-center gap-2 text-sm text-pendo-pink hover:text-pendo-pink-dark hover:underline transition-colors text-left"
                       >
                         <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                         </svg>
                         {doc.title}
-                      </a>
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -273,11 +361,9 @@ export function ModulePage() {
               <ul className="space-y-3">
                 {recordings.map((rec, i) => (
                   <li key={i}>
-                    <a
-                      href={rec.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-pendo-pink hover:bg-pendo-pink hover:bg-opacity-5 transition-all group"
+                    <button
+                      onClick={() => setModalLink({ url: rec.url, title: rec.title })}
+                      className="w-full flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-pendo-pink hover:bg-pendo-pink hover:bg-opacity-5 transition-all group text-left"
                     >
                       <div className="w-8 h-8 rounded-lg bg-pendo-pink bg-opacity-10 flex items-center justify-center text-pendo-pink flex-shrink-0">
                         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -288,7 +374,7 @@ export function ModulePage() {
                       <svg className="w-4 h-4 text-gray-400 group-hover:text-pendo-pink ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                       </svg>
-                    </a>
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -315,36 +401,21 @@ export function ModulePage() {
                 </div>
               )}
 
-              {/* Embedded exec.com session */}
-              {content.exec_url ? (
-                <div className="rounded-xl overflow-hidden border border-gray-200 shadow-sm" style={{ height: '640px' }}>
-                  <iframe
-                    src={content.exec_url}
-                    className="w-full h-full"
-                    allow="camera; microphone; fullscreen; autoplay; clipboard-write"
-                    allowFullScreen
-                    title={`exec.com practice — ${module.title}`}
-                    sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
-                  />
-                </div>
-              ) : (
-                <a
-                  href="https://exec.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 bg-pendo-navy text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-opacity-90 transition-colors"
-                >
-                  Open exec.com
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                  </svg>
-                </a>
-              )}
+              {/* Open exec.com as full-screen modal */}
+              <button
+                onClick={() => { setExecModalOpen(true); setExecAttempted(true) }}
+                className="inline-flex items-center gap-2 bg-pendo-navy text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-opacity-90 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                Open exec.com
+              </button>
             </Section>
           )}
         </div>
 
-        {/* Mark Complete button */}
+        {/* Completion footer */}
         <div className="mt-8 pt-6 border-t border-gray-200 flex items-center justify-between">
           <Link to="/dashboard" className="text-sm text-gray-500 hover:text-pendo-navy transition-colors flex items-center gap-1">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -352,36 +423,88 @@ export function ModulePage() {
             </svg>
             Back to Dashboard
           </Link>
+
           {isCompleted ? (
             <div className="flex items-center gap-2 text-green-700 font-medium">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              Module Complete
+              Module Complete — next module unlocked!
             </div>
+          ) : content.exec_url ? (
+            // Exec-gated modules: completion flows from the scenario
+            execAttempted ? (
+              <div className="flex flex-col items-end gap-1">
+                <button
+                  onClick={handleMarkComplete}
+                  disabled={completing}
+                  className="flex items-center gap-2 bg-pendo-pink text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-pendo-pink-dark transition-colors disabled:opacity-60"
+                >
+                  {completing ? (
+                    <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving…</>
+                  ) : (
+                    <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>I've Completed the Scenario</>
+                  )}
+                </button>
+                <p className="text-xs text-gray-400">Only mark complete after finishing the exec.com practice session</p>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400 italic">Complete the practice scenario above to unlock the next module</p>
+            )
           ) : (
+            // Non-exec modules: standard mark complete
             <button
               onClick={handleMarkComplete}
               disabled={completing}
               className="flex items-center gap-2 bg-pendo-pink text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-pendo-pink-dark transition-colors disabled:opacity-60"
             >
               {completing ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Saving…
-                </>
+                <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving…</>
               ) : (
-                <>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Mark Complete
-                </>
+                <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>Mark Complete</>
               )}
             </button>
           )}
         </div>
       </div>
+
+      {/* exec.com full-screen modal */}
+      {execModalOpen && (content.exec_url || module) && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-black bg-opacity-80">
+          {/* Thin header bar */}
+          <div className="flex items-center justify-between px-4 py-2 bg-pendo-navy flex-shrink-0">
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-white opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+              </svg>
+              <span className="text-white text-sm font-medium">Practice with exec.com</span>
+            </div>
+            <button
+              onClick={() => setExecModalOpen(false)}
+              className="text-white text-opacity-70 hover:text-opacity-100 transition-colors flex items-center gap-1.5 text-sm"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Close
+            </button>
+          </div>
+          {/* Full iframe */}
+          <iframe
+            src={content.exec_url || 'https://exec.com'}
+            className="flex-1 w-full border-0"
+            allow="camera; microphone; fullscreen; autoplay; clipboard-write; display-capture"
+            allowFullScreen
+            title={`exec.com practice — ${module.title}`}
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads"
+          />
+        </div>
+      )}
+
+      {/* Link modal */}
+      {modalLink && (
+        <LinkModal url={modalLink.url} title={modalLink.title} onClose={() => setModalLink(null)} />
+      )}
     </Layout>
   )
 }

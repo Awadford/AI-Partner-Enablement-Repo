@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { Layout } from '../../components/Layout'
-import { Partner, LmsModule, LmsPartnerModule, LmsPartnerDomain, LmsProfile, LmsUserProgress } from '../../types'
+import { Partner, LmsModule, LmsPartnerModule, LmsPartnerDomain, LmsProfile, LmsUserProgress, LmsCertification, LmsUserCertification } from '../../types'
 
 interface ModuleRow extends LmsModule {
   pm: LmsPartnerModule | null
@@ -11,6 +11,13 @@ interface ModuleRow extends LmsModule {
 interface LearnerRow extends LmsProfile {
   completed: number
   total: number
+  earnedCertIds: Set<string>
+  moduleProgress: Record<string, 'not_started' | 'in_progress' | 'completed'>
+}
+
+interface CertRow extends LmsCertification {
+  pcId: string | null  // lms_partner_certifications.id
+  enabled: boolean
 }
 
 export function AdminPartnerDetail() {
@@ -26,20 +33,25 @@ export function AdminPartnerDetail() {
   const [addingDomain, setAddingDomain] = useState(false)
 
   const [modules, setModules] = useState<ModuleRow[]>([])
+  const [certifications, setCertifications] = useState<CertRow[]>([])
   const [learners, setLearners] = useState<LearnerRow[]>([])
+  const [certFilter, setCertFilter] = useState<string>('all')
 
   const [loading, setLoading] = useState(true)
 
   const loadData = useCallback(async () => {
     if (!partnerId) return
 
-    const [partnerRes, domainsRes, modulesRes, pmRes, profilesRes, progressRes] = await Promise.all([
+    const [partnerRes, domainsRes, modulesRes, pmRes, profilesRes, progressRes, certsRes, pcRes, ucRes] = await Promise.all([
       supabase.from('partners').select('*').eq('id', partnerId).single(),
       supabase.from('lms_partner_domains').select('*').eq('partner_id', partnerId),
       supabase.from('lms_modules').select('*').order('default_order'),
       supabase.from('lms_partner_modules').select('*').eq('partner_id', partnerId),
       supabase.from('lms_profiles').select('*').eq('partner_id', partnerId).eq('is_admin', false),
       supabase.from('lms_user_progress').select('*'),
+      supabase.from('lms_certifications').select('*').order('order_index'),
+      supabase.from('lms_partner_certifications').select('*').eq('partner_id', partnerId),
+      supabase.from('lms_user_certifications').select('*'),
     ])
 
     const p = partnerRes.data as Partner
@@ -69,11 +81,33 @@ export function AdminPartnerDetail() {
     const progressList = (progressRes.data ?? []) as LmsUserProgress[]
     const enabledModuleCount = rows.filter(r => r.pm?.enabled).length
 
+    const userCertList = (ucRes.data ?? []) as LmsUserCertification[]
     const learnerRows: LearnerRow[] = profileList.map(prof => {
-      const completed = progressList.filter(pr => pr.user_id === prof.id && pr.status === 'completed').length
-      return { ...prof, completed, total: enabledModuleCount }
+      const userProgress = progressList.filter(pr => pr.user_id === prof.id)
+      const moduleProgress: Record<string, 'not_started' | 'in_progress' | 'completed'> = {}
+      for (const pr of userProgress) {
+        moduleProgress[pr.module_id] = pr.status as 'not_started' | 'in_progress' | 'completed'
+      }
+      const completed = userProgress.filter(pr => pr.status === 'completed').length
+      const earnedCertIds = new Set(
+        userCertList.filter(uc => uc.user_id === prof.id).map(uc => uc.certification_id)
+      )
+      return { ...prof, completed, total: enabledModuleCount, earnedCertIds, moduleProgress }
     })
     setLearners(learnerRows)
+
+    // Build cert rows
+    const pcMap: Record<string, { id: string; enabled: boolean }> = {}
+    for (const pc of (pcRes.data ?? []) as any[]) {
+      pcMap[pc.certification_id] = { id: pc.id, enabled: pc.enabled }
+    }
+    const certRows: CertRow[] = ((certsRes.data ?? []) as LmsCertification[]).map(c => ({
+      ...c,
+      pcId: pcMap[c.id]?.id ?? null,
+      enabled: pcMap[c.id]?.enabled ?? false,
+    }))
+    setCertifications(certRows)
+
     setLoading(false)
   }, [partnerId])
 
@@ -113,6 +147,50 @@ export function AdminPartnerDetail() {
   const deleteDomain = async (id: string) => {
     const { error } = await supabase.from('lms_partner_domains').delete().eq('id', id)
     if (!error) setDomains(prev => prev.filter(d => d.id !== id))
+  }
+
+  const toggleUserCert = async (learner: LearnerRow, certId: string) => {
+    const earned = learner.earnedCertIds.has(certId)
+    if (earned) {
+      await supabase.from('lms_user_certifications')
+        .delete()
+        .eq('user_id', learner.id)
+        .eq('certification_id', certId)
+      setLearners(prev => prev.map(l => {
+        if (l.id !== learner.id) return l
+        const next = new Set(l.earnedCertIds)
+        next.delete(certId)
+        return { ...l, earnedCertIds: next }
+      }))
+    } else {
+      await supabase.from('lms_user_certifications')
+        .insert([{ user_id: learner.id, certification_id: certId }])
+      setLearners(prev => prev.map(l => {
+        if (l.id !== learner.id) return l
+        const next = new Set(l.earnedCertIds)
+        next.add(certId)
+        return { ...l, earnedCertIds: next }
+      }))
+    }
+  }
+
+  const toggleCert = async (cert: CertRow) => {
+    if (!partnerId) return
+    if (cert.pcId) {
+      const { error } = await supabase.from('lms_partner_certifications')
+        .update({ enabled: !cert.enabled })
+        .eq('id', cert.pcId)
+      if (!error) {
+        setCertifications(prev => prev.map(c => c.id === cert.id ? { ...c, enabled: !c.enabled } : c))
+      }
+    } else {
+      const { data, error } = await supabase.from('lms_partner_certifications')
+        .insert([{ partner_id: partnerId, certification_id: cert.id, enabled: true }])
+        .select().single()
+      if (!error && data) {
+        setCertifications(prev => prev.map(c => c.id === cert.id ? { ...c, pcId: (data as any).id, enabled: true } : c))
+      }
+    }
   }
 
   const toggleModule = async (mod: ModuleRow) => {
@@ -272,6 +350,42 @@ export function AdminPartnerDetail() {
             </div>
           </div>
 
+          {/* Certifications */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="font-semibold text-pendo-navy text-lg mb-2">Certifications</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              Toggle which Pendo Academy certifications learners should complete before starting enablement.
+            </p>
+            <div className="space-y-2">
+              {certifications.map(cert => (
+                <div key={cert.id} className={`flex items-center gap-3 p-3 rounded-lg border transition-colors
+                  ${cert.enabled ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 opacity-60'}`}>
+                  <div className="flex-1 min-w-0">
+                    <a
+                      href={cert.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm font-medium text-pendo-navy hover:text-pendo-pink transition-colors"
+                    >
+                      {cert.title} ↗
+                    </a>
+                    {cert.description && (
+                      <p className="text-xs text-gray-500 mt-0.5 truncate">{cert.description}</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => toggleCert(cert)}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0
+                      ${cert.enabled ? 'bg-pendo-pink' : 'bg-gray-300'}`}
+                  >
+                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform
+                      ${cert.enabled ? 'translate-x-4' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Modules */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 className="font-semibold text-pendo-navy text-lg mb-2">Modules</h2>
@@ -329,43 +443,124 @@ export function AdminPartnerDetail() {
 
           {/* Learners */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="font-semibold text-pendo-navy text-lg mb-4">
-              Learners <span className="text-gray-400 font-normal text-base">({learners.length})</span>
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-pendo-navy text-lg">
+                Learners <span className="text-gray-400 font-normal text-base">({learners.length})</span>
+              </h2>
+              {certifications.filter(c => c.enabled).length > 0 && (
+                <select
+                  value={certFilter}
+                  onChange={e => setCertFilter(e.target.value)}
+                  className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-pendo-pink"
+                >
+                  <option value="all">All Learners</option>
+                  {certifications.filter(c => c.enabled).map(c => (
+                    <option key={c.id} value={c.id}>Has: {c.title}</option>
+                  ))}
+                  {certifications.filter(c => c.enabled).map(c => (
+                    <option key={`missing-${c.id}`} value={`missing-${c.id}`}>Missing: {c.title}</option>
+                  ))}
+                </select>
+              )}
+            </div>
             {learners.length === 0 ? (
               <p className="text-sm text-gray-400 italic">No learners registered for this partner yet.</p>
-            ) : (
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-100">
-                    <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2">Name / Email</th>
-                    <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2">Progress</th>
-                    <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2">Completion</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {learners.map(l => (
-                    <tr key={l.id}>
-                      <td className="py-3">
-                        <div className="font-medium text-pendo-navy text-sm">{l.full_name ?? '—'}</div>
-                        <div className="text-xs text-gray-500">{l.email}</div>
-                      </td>
-                      <td className="py-3">
-                        <div className="w-32 bg-gray-200 rounded-full h-1.5">
-                          <div
-                            className="bg-pendo-pink rounded-full h-1.5 transition-all"
-                            style={{ width: l.total === 0 ? '0%' : `${Math.round((l.completed / l.total) * 100)}%` }}
-                          />
-                        </div>
-                      </td>
-                      <td className="py-3 text-right">
-                        <span className="text-sm text-gray-600">{l.completed}/{l.total}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+            ) : (() => {
+              const enabledCerts = certifications.filter(c => c.enabled)
+              const filtered = learners.filter(l => {
+                if (certFilter === 'all') return true
+                if (certFilter.startsWith('missing-')) {
+                  const cId = certFilter.replace('missing-', '')
+                  return !l.earnedCertIds.has(cId)
+                }
+                return l.earnedCertIds.has(certFilter)
+              })
+              return (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[600px]">
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-4">Name</th>
+                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-4">Title</th>
+                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-4">Email</th>
+                        {enabledCerts.map(c => (
+                          <th key={c.id} className="text-center text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 px-2 max-w-[80px]">
+                            <span className="block truncate" title={c.title}>{c.title.replace('Pendo Essentials for ', '').replace('Pendo for ', '')}</span>
+                          </th>
+                        ))}
+                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pl-4">Module Progress</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {filtered.map(l => {
+                        const enabledModules = modules.filter(m => m.pm?.enabled)
+                        return (
+                        <tr key={l.id} className="hover:bg-gray-50">
+                          <td className="py-3 pr-4">
+                            <span className="font-medium text-pendo-navy text-sm">{l.full_name ?? '—'}</span>
+                          </td>
+                          <td className="py-3 pr-4">
+                            <span className="text-sm text-gray-500">{l.title ?? '—'}</span>
+                          </td>
+                          <td className="py-3 pr-4">
+                            <span className="text-sm text-gray-500">{l.email}</span>
+                          </td>
+                          {enabledCerts.map(c => (
+                            <td key={c.id} className="py-3 px-2 text-center">
+                              <button
+                                onClick={() => toggleUserCert(l, c.id)}
+                                title={l.earnedCertIds.has(c.id) ? 'Mark as not completed' : 'Mark as completed'}
+                                className={`w-6 h-6 rounded-full flex items-center justify-center mx-auto transition-colors
+                                  ${l.earnedCertIds.has(c.id)
+                                    ? 'bg-green-100 text-green-600 hover:bg-green-200'
+                                    : 'bg-gray-100 text-gray-300 hover:bg-gray-200'}`}
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                </svg>
+                              </button>
+                            </td>
+                          ))}
+                          <td className="py-3 pl-4">
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {enabledModules.map(m => {
+                                const status = l.moduleProgress[m.id] ?? 'not_started'
+                                const colors = {
+                                  completed: 'bg-green-500',
+                                  in_progress: 'bg-amber-400',
+                                  not_started: 'bg-gray-200',
+                                }
+                                const labels = {
+                                  completed: 'Completed',
+                                  in_progress: 'In Progress',
+                                  not_started: 'Not Started',
+                                }
+                                return (
+                                  <div
+                                    key={m.id}
+                                    title={`${m.title}: ${labels[status]}`}
+                                    className={`w-3 h-3 rounded-full flex-shrink-0 ${colors[status]}`}
+                                  />
+                                )
+                              })}
+                              <span className="text-xs text-gray-400 ml-1">{l.completed}/{l.total}</span>
+                            </div>
+                          </td>
+                        </tr>
+                        )
+                      })}
+                      {filtered.length === 0 && (
+                        <tr>
+                          <td colSpan={4 + enabledCerts.length} className="py-8 text-center text-sm text-gray-400 italic">
+                            No learners match this filter.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            })()}
           </div>
         </div>
       </div>
