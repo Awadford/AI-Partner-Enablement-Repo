@@ -215,17 +215,55 @@ export function ModulePage() {
   const overrides = content.iframe_overrides ?? {}
 
   // Renders the Academy/iframe embed used when a section is overridden
-  const IframeEmbed = ({ title }: { title: string }) => (
-    <div className="rounded-lg overflow-hidden border border-gray-200" style={{ height: '560px' }}>
-      <iframe
-        src={iframeUrl!}
-        title={title}
-        className="w-full h-full"
-        allow="fullscreen; autoplay"
-        allowFullScreen
-      />
-    </div>
-  )
+  const IframeEmbed = ({ title }: { title: string }) => {
+    const [failed, setFailed] = useState(false)
+    // Detect embed block via timeout — X-Frame-Options errors don't fire onError on iframes
+    const [timedOut, setTimedOut] = useState(false)
+    const [loaded, setLoaded] = useState(false)
+    useEffect(() => {
+      const t = setTimeout(() => { if (!loaded) setTimedOut(true) }, 4000)
+      return () => clearTimeout(t)
+    }, [loaded])
+    const blocked = failed || timedOut
+    if (blocked) {
+      return (
+        <div className="rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 p-8 flex flex-col items-center gap-4 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-pendo-navy bg-opacity-5 flex items-center justify-center text-2xl">🎓</div>
+          <div>
+            <p className="font-semibold text-pendo-navy mb-1">{title}</p>
+            <p className="text-sm text-gray-500 max-w-xs">This content can't be embedded — click below to open it in a new tab.</p>
+          </div>
+          <button
+            onClick={() => window.open(iframeUrl!, '_blank')}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-pendo-pink text-white font-semibold rounded-xl hover:bg-opacity-90 transition-colors text-sm"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+            Open Course
+          </button>
+        </div>
+      )
+    }
+    return (
+      <div className="rounded-lg overflow-hidden border border-gray-200 relative" style={{ height: '560px' }}>
+        {!loaded && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pendo-pink" />
+          </div>
+        )}
+        <iframe
+          src={iframeUrl!}
+          title={title}
+          className="w-full h-full"
+          allow="fullscreen; autoplay"
+          allowFullScreen
+          onLoad={() => setLoaded(true)}
+          onError={() => setFailed(true)}
+        />
+      </div>
+    )
+  }
 
   return (
     <Layout>
@@ -270,7 +308,7 @@ export function ModulePage() {
         <div className="space-y-4">
           {/* 1. Learn — Video */}
           <Section
-            title="Learn — Overview Video"
+            title={iframeUrl && overrides.video ? 'Academy Course' : 'Learn — Overview Video'}
             icon={
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
@@ -306,7 +344,7 @@ export function ModulePage() {
           {/* 2. Resources */}
           {(docs.length > 0 || (iframeUrl && overrides.resources)) && (
             <Section
-              title="Resources"
+              title={iframeUrl && overrides.resources ? 'Academy Course' : 'Resources'}
               icon={
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -375,7 +413,7 @@ export function ModulePage() {
           {/* 4. Watch — Customer Recordings */}
           {(recordings.length > 0 || (iframeUrl && overrides.recordings)) && (
             <Section
-              title="Watch — Customer Recordings"
+              title={iframeUrl && overrides.recordings ? 'Academy Course' : 'Watch — Customer Recordings'}
               icon={
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.263a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -412,7 +450,7 @@ export function ModulePage() {
           {/* 5. Record — exec.com */}
           {(content.exec_prompt || content.exec_url || (iframeUrl && overrides.exec)) && (
             <Section
-              title="Record — Practice with exec.com"
+              title={iframeUrl && overrides.exec ? 'Academy Course' : 'Record — Practice with exec.com'}
               icon={
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
