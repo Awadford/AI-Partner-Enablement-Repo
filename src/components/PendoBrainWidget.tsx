@@ -10,26 +10,10 @@ export function PendoBrainWidget() {
       {/* Floating button */}
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95 flex items-center justify-center overflow-hidden"
+        className="fixed bottom-6 right-6 z-40 w-16 h-16 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95 overflow-hidden p-0 border-0"
         title="Ask Pendo Brain"
-        style={{ background: 'linear-gradient(135deg, #1a1c3e 0%, #e8185a 100%)' }}
       >
-        {/* Pendo Brain Dino SVG */}
-        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-          {/* Simple dino/brain silhouette */}
-          <circle cx="16" cy="10" r="7" fill="white" fillOpacity="0.9"/>
-          <path d="M10 13 Q8 18 10 22 L14 24 L18 24 L22 22 Q24 18 22 13" fill="white" fillOpacity="0.9"/>
-          <circle cx="13" cy="9" r="1.5" fill="#e8185a"/>
-          <circle cx="19" cy="9" r="1.5" fill="#e8185a"/>
-          <path d="M13 12.5 Q16 14 19 12.5" stroke="#1a1c3e" strokeWidth="1" strokeLinecap="round" fill="none"/>
-          {/* Brain squiggle on top */}
-          <path d="M11 6 Q12 4 14 5 Q15 3 17 4 Q19 3 20 5 Q22 4 22 6" stroke="white" strokeWidth="1.2" strokeLinecap="round" fill="none"/>
-          {/* Tiny arms */}
-          <path d="M10 17 L7 15" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-          <path d="M22 17 L25 15" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-          {/* Tiny tail */}
-          <path d="M14 24 Q13 27 11 28" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-        </svg>
+        <img src="/pendo-brain-icon.png" alt="Pendo Brain" className="w-full h-full object-cover" />
       </button>
 
       {/* Panel */}
@@ -37,14 +21,8 @@ export function PendoBrainWidget() {
         <div className="fixed bottom-24 right-6 z-50 w-80 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden animate-in">
           {/* Header */}
           <div className="p-4 flex items-center gap-3" style={{ background: 'linear-gradient(135deg, #1a1c3e 0%, #2d2f5e 100%)' }}>
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(255,255,255,0.15)' }}>
-              <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
-                <circle cx="16" cy="10" r="7" fill="white" fillOpacity="0.9"/>
-                <path d="M10 13 Q8 18 10 22 L14 24 L18 24 L22 22 Q24 18 22 13" fill="white" fillOpacity="0.9"/>
-                <circle cx="13" cy="9" r="1.5" fill="#e8185a"/>
-                <circle cx="19" cy="9" r="1.5" fill="#e8185a"/>
-                <path d="M11 6 Q12 4 14 5 Q15 3 17 4 Q19 3 20 5 Q22 4 22 6" stroke="white" strokeWidth="1.2" strokeLinecap="round" fill="none"/>
-              </svg>
+            <div className="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0">
+              <img src="/pendo-brain-icon.png" alt="Pendo Brain" className="w-full h-full object-cover" />
             </div>
             <div className="flex-1">
               <p className="text-white font-semibold text-sm">Pendo Brain</p>
