@@ -10,7 +10,7 @@ import { LmsModule, ModuleDoc, ModuleRecording } from '../../types'
 
 /** Returns true for content we can embed in an in-app iframe */
 function isEmbeddable(url: string): boolean {
-  return /loom\.com|youtube\.com|youtu\.be|vimeo\.com|wistia\.com/i.test(url)
+  return /loom\.com|youtube\.com|youtu\.be|vimeo\.com|wistia\.(com|net)/i.test(url)
 }
 
 // Detects whether a URL is an embeddable video or a link-only source
@@ -18,7 +18,7 @@ function VideoPlayer({ url, title, onOpenModal: _onOpenModal }: { url: string; t
   const isLoom = /loom\.com/i.test(url)
   const isYouTube = /youtube\.com|youtu\.be/i.test(url)
   const isVimeo = /vimeo\.com/i.test(url)
-  const isWistia = /wistia\.com/i.test(url)
+  const isWistia = /wistia\.(com|net)/i.test(url)
   const isLinkOnly = /zoom\.us|pendo\.zoom|gong\.io/i.test(url)
 
   // Non-embeddable sources — open directly in new tab
