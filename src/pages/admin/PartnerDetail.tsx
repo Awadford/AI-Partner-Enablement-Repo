@@ -181,11 +181,16 @@ export function AdminPartnerDetail() {
     // Check if they already have a profile
     const { data: existing } = await supabase
       .from('lms_profiles')
-      .select('id, partner_id, email')
+      .select('id, partner_id, email, is_admin')
       .eq('email', email)
       .single()
 
     if (existing) {
+      if (existing.is_admin) {
+        setAddLearnerMsg({ type: 'error', text: `${email} is an admin account and cannot be added as a learner.` })
+        setAddingLearner(false)
+        return
+      }
       // Already registered — update their partner assignment
       const { error } = await supabase
         .from('lms_profiles')
