@@ -21,7 +21,7 @@ interface EditState {
   exec_prompt: string
   iframe_url: string
   iframe_overrides: IframeOverrides
-  academy_courses: DocItem[]
+  academy_courses: { label: string; url: string }[]
 }
 
 export function AdminModules() {
@@ -65,7 +65,7 @@ export function AdminModules() {
         recordings: m.content?.iframe_overrides?.recordings ?? false,
         exec: m.content?.iframe_overrides?.exec ?? false,
       },
-      academy_courses: m.content?.academy_courses?.map((c: DocItem) => ({ ...c })) ?? [],
+      academy_courses: m.content?.academy_courses?.map((c: { label: string; url: string }) => ({ ...c })) ?? [],
     })
   }
 
