@@ -137,6 +137,7 @@ export function ModulePage() {
   const [markedComplete, setMarkedComplete] = useState(false)
   const [modalLink, setModalLink] = useState<{ url: string; title: string } | null>(null)
   const [execAttempted, setExecAttempted] = useState(false)
+  const [selectedCourse, setSelectedCourse] = useState(0)
 
   useEffect(() => {
     async function load() {
@@ -212,12 +213,18 @@ export function ModulePage() {
   const content = module.content ?? {}
   const docs: ModuleDoc[] = content.docs ?? []
   const recordings: ModuleRecording[] = content.recordings ?? []
-  const iframeUrls = content.iframe_urls ?? {}
+  const academyCourses: { label: string; url: string }[] = content.academy_courses ?? []
+  const overrides = content.iframe_overrides ?? {}
+  const hasAcademy = academyCourses.length > 0
+  // Legacy fallback: per-section or single iframe URL
+  const legacyIframeUrls = content.iframe_urls ?? {}
   const legacyIframeUrl = content.iframe_url
   const legacyOverrides = content.iframe_overrides ?? {}
-  // Per-section URL: prefer iframe_urls.{section}, fall back to legacy iframe_url if that section is toggled on
   const sectionIframe = (section: 'video' | 'resources' | 'recordings' | 'exec'): string | null =>
-    iframeUrls[section] || (legacyOverrides[section] ? legacyIframeUrl ?? null : null)
+    legacyIframeUrls[section] || (legacyOverrides[section] ? legacyIframeUrl ?? null : null)
+  // Returns true if this section should show the Academy Courses block
+  const isAcademySection = (section: 'video' | 'resources' | 'recordings' | 'exec') =>
+    hasAcademy && !!overrides[section]
 
   // Renders the Academy/iframe embed used when a section is overridden
   const IframeEmbed = ({ title, url }: { title: string; url: string }) => {
@@ -270,6 +277,34 @@ export function ModulePage() {
     )
   }
 
+  // Academy Courses block — dropdown + iframe, shown wherever sections are overridden
+  const AcademyCoursesBlock = () => {
+    const course = academyCourses[selectedCourse] ?? academyCourses[0]
+    if (!course) return null
+    return (
+      <div>
+        {academyCourses.length > 1 && (
+          <div className="mb-4">
+            <label className="block text-xs font-medium text-gray-500 mb-1">Select a course</label>
+            <select
+              value={selectedCourse}
+              onChange={e => setSelectedCourse(Number(e.target.value))}
+              className="w-full sm:w-auto border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pendo-pink bg-white"
+            >
+              {academyCourses.map((c, i) => (
+                <option key={i} value={i}>{c.label || `Course ${i + 1}`}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        {academyCourses.length === 1 && (
+          <p className="text-sm font-medium text-pendo-navy mb-3">{course.label}</p>
+        )}
+        <IframeEmbed title={course.label || module!.title} url={course.url} />
+      </div>
+    )
+  }
+
   return (
     <Layout>
       <div className="max-w-3xl mx-auto py-8 px-4 sm:px-6">
@@ -313,7 +348,7 @@ export function ModulePage() {
         <div className="space-y-4">
           {/* 1. Learn — Video */}
           <Section
-            title={sectionIframe('video') ? 'Academy Course' : 'Learn — Overview Video'}
+            title={isAcademySection('video') || sectionIframe('video') ? 'Academy Courses' : 'Learn — Overview Video'}
             icon={
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
@@ -321,7 +356,9 @@ export function ModulePage() {
               </svg>
             }
           >
-            {sectionIframe('video') ? (
+            {isAcademySection('video') ? (
+              <AcademyCoursesBlock />
+            ) : sectionIframe('video') ? (
               <IframeEmbed title={`${module.title} — Academy Course`} url={sectionIframe('video')!} />
             ) : content.video_url ? (
               content.video_url_extension ? (
@@ -347,16 +384,18 @@ export function ModulePage() {
           </Section>
 
           {/* 2. Resources */}
-          {(docs.length > 0 || sectionIframe('resources')) && (
+          {(docs.length > 0 || isAcademySection('resources') || sectionIframe('resources')) && (
             <Section
-              title={sectionIframe('resources') ? 'Academy Course' : 'Resources'}
+              title={isAcademySection('resources') || sectionIframe('resources') ? 'Academy Courses' : 'Resources'}
               icon={
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               }
             >
-              {sectionIframe('resources') ? (
+              {isAcademySection('resources') ? (
+                <AcademyCoursesBlock />
+              ) : sectionIframe('resources') ? (
                 <IframeEmbed title={`${module.title} — Resources`} url={sectionIframe('resources')!} />
               ) : (<>
               <button
@@ -416,16 +455,18 @@ export function ModulePage() {
           )}
 
           {/* 4. Watch — Customer Recordings */}
-          {(recordings.length > 0 || sectionIframe('recordings')) && (
+          {(recordings.length > 0 || isAcademySection('recordings') || sectionIframe('recordings')) && (
             <Section
-              title={sectionIframe('recordings') ? 'Academy Course' : 'Watch — Customer Recordings'}
+              title={isAcademySection('recordings') || sectionIframe('recordings') ? 'Academy Courses' : 'Watch — Customer Recordings'}
               icon={
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.263a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
               }
             >
-              {sectionIframe('recordings') ? (
+              {isAcademySection('recordings') ? (
+                <AcademyCoursesBlock />
+              ) : sectionIframe('recordings') ? (
                 <IframeEmbed title={`${module.title} — Recordings`} url={sectionIframe('recordings')!} />
               ) : (
               <ul className="space-y-3">
@@ -467,16 +508,18 @@ export function ModulePage() {
           )}
 
           {/* 5. Record — exec.com */}
-          {(content.exec_prompt || content.exec_url || sectionIframe('exec')) && (
+          {(content.exec_prompt || content.exec_url || isAcademySection('exec') || sectionIframe('exec')) && (
             <Section
-              title={sectionIframe('exec') ? 'Academy Course' : 'Record — Practice with exec.com'}
+              title={isAcademySection('exec') || sectionIframe('exec') ? 'Academy Courses' : 'Record — Practice with exec.com'}
               icon={
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                 </svg>
               }
             >
-              {sectionIframe('exec') ? (
+              {isAcademySection('exec') ? (
+                <AcademyCoursesBlock />
+              ) : sectionIframe('exec') ? (
                 <IframeEmbed title={`${module.title} — Practice`} url={sectionIframe('exec')!} />
               ) : (<>
               {/* Prompt / instructions always shown if present */}
