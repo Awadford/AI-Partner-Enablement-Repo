@@ -218,9 +218,6 @@ export function ModulePage() {
   // Per-section URL: prefer iframe_urls.{section}, fall back to legacy iframe_url if that section is toggled on
   const sectionIframe = (section: 'video' | 'resources' | 'recordings' | 'exec'): string | null =>
     iframeUrls[section] || (legacyOverrides[section] ? legacyIframeUrl ?? null : null)
-  // Keep legacy aliases for components that still use them
-  const iframeUrl = legacyIframeUrl
-  const overrides = legacyOverrides
 
   // Renders the Academy/iframe embed used when a section is overridden
   const IframeEmbed = ({ title, url }: { title: string; url: string }) => {

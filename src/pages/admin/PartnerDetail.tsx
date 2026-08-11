@@ -20,6 +20,13 @@ interface CertRow extends LmsCertification {
   enabled: boolean
 }
 
+interface PendingRegistration {
+  id: string
+  email: string
+  full_name: string | null
+  created_at: string
+}
+
 export function AdminPartnerDetail() {
   const { partnerId } = useParams<{ partnerId: string }>()
 
@@ -31,18 +38,25 @@ export function AdminPartnerDetail() {
   const [domains, setDomains] = useState<LmsPartnerDomain[]>([])
   const [newDomain, setNewDomain] = useState('')
   const [addingDomain, setAddingDomain] = useState(false)
+  const [domainError, setDomainError] = useState<string | null>(null)
 
   const [modules, setModules] = useState<ModuleRow[]>([])
   const [certifications, setCertifications] = useState<CertRow[]>([])
   const [learners, setLearners] = useState<LearnerRow[]>([])
+  const [pendingRegistrations, setPendingRegistrations] = useState<PendingRegistration[]>([])
   const [certFilter, setCertFilter] = useState<string>('all')
+  const [showAddLearner, setShowAddLearner] = useState(false)
+  const [newLearnerEmail, setNewLearnerEmail] = useState('')
+  const [newLearnerName, setNewLearnerName] = useState('')
+  const [addingLearner, setAddingLearner] = useState(false)
+  const [addLearnerMsg, setAddLearnerMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const [loading, setLoading] = useState(true)
 
   const loadData = useCallback(async () => {
     if (!partnerId) return
 
-    const [partnerRes, domainsRes, modulesRes, pmRes, profilesRes, progressRes, certsRes, pcRes, ucRes] = await Promise.all([
+    const [partnerRes, domainsRes, modulesRes, pmRes, profilesRes, progressRes, certsRes, pcRes, ucRes, pendingRes] = await Promise.all([
       supabase.from('partners').select('*').eq('id', partnerId).single(),
       supabase.from('lms_partner_domains').select('*').eq('partner_id', partnerId),
       supabase.from('lms_modules').select('*').order('default_order'),
@@ -52,7 +66,10 @@ export function AdminPartnerDetail() {
       supabase.from('lms_certifications').select('*').order('order_index'),
       supabase.from('lms_partner_certifications').select('*').eq('partner_id', partnerId),
       supabase.from('lms_user_certifications').select('*'),
+      supabase.from('lms_pending_registrations').select('*').eq('partner_id', partnerId).order('created_at'),
     ])
+
+    setPendingRegistrations((pendingRes.data ?? []) as PendingRegistration[])
 
     const p = partnerRes.data as Partner
     setPartner(p)
@@ -132,6 +149,7 @@ export function AdminPartnerDetail() {
   const addDomain = async () => {
     if (!newDomain.trim() || !partnerId) return
     setAddingDomain(true)
+    setDomainError(null)
     const { data, error } = await supabase
       .from('lms_partner_domains')
       .insert([{ partner_id: partnerId, domain: newDomain.trim().toLowerCase() }])
@@ -140,6 +158,8 @@ export function AdminPartnerDetail() {
     if (!error && data) {
       setDomains(prev => [...prev, data as LmsPartnerDomain])
       setNewDomain('')
+    } else if (error) {
+      setDomainError(error.code === '23505' ? 'That domain is already registered to another partner.' : error.message)
     }
     setAddingDomain(false)
   }
@@ -147,6 +167,61 @@ export function AdminPartnerDetail() {
   const deleteDomain = async (id: string) => {
     const { error } = await supabase.from('lms_partner_domains').delete().eq('id', id)
     if (!error) setDomains(prev => prev.filter(d => d.id !== id))
+  }
+
+  const addLearner = async () => {
+    if (!newLearnerEmail.trim() || !partnerId) return
+    setAddingLearner(true)
+    setAddLearnerMsg(null)
+    const email = newLearnerEmail.trim().toLowerCase()
+    const name = newLearnerName.trim() || null
+
+    // Check if they already have a profile
+    const { data: existing } = await supabase
+      .from('lms_profiles')
+      .select('id, partner_id, email')
+      .eq('email', email)
+      .single()
+
+    if (existing) {
+      // Already registered — update their partner assignment
+      const { error } = await supabase
+        .from('lms_profiles')
+        .update({ partner_id: partnerId, ...(name ? { full_name: name } : {}) })
+        .eq('id', existing.id)
+      if (error) {
+        setAddLearnerMsg({ type: 'error', text: 'Failed to update learner.' })
+      } else {
+        setAddLearnerMsg({ type: 'success', text: `${email} assigned to this partner.` })
+        setNewLearnerEmail('')
+        setNewLearnerName('')
+        await loadData()
+      }
+    } else {
+      // Not yet registered — pre-register them
+      const { data, error } = await supabase
+        .from('lms_pending_registrations')
+        .upsert([{ email, partner_id: partnerId, full_name: name }], { onConflict: 'email' })
+        .select()
+        .single()
+      if (error) {
+        setAddLearnerMsg({ type: 'error', text: 'Failed to add learner. They may already be registered to another partner.' })
+      } else {
+        setPendingRegistrations(prev => {
+          const filtered = prev.filter(p => p.email !== email)
+          return [...filtered, data as PendingRegistration]
+        })
+        setAddLearnerMsg({ type: 'success', text: `${email} pre-registered. They'll be assigned here when they sign up.` })
+        setNewLearnerEmail('')
+        setNewLearnerName('')
+      }
+    }
+    setAddingLearner(false)
+  }
+
+  const removePendingRegistration = async (id: string) => {
+    const { error } = await supabase.from('lms_pending_registrations').delete().eq('id', id)
+    if (!error) setPendingRegistrations(prev => prev.filter(p => p.id !== id))
   }
 
   const toggleUserCert = async (learner: LearnerRow, certId: string) => {
@@ -348,6 +423,7 @@ export function AdminPartnerDetail() {
                 Add
               </button>
             </div>
+            {domainError && <p className="text-xs text-red-500 mt-2">{domainError}</p>}
           </div>
 
           {/* Certifications */}
@@ -443,24 +519,97 @@ export function AdminPartnerDetail() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-semibold text-pendo-navy text-lg">
-                Learners <span className="text-gray-400 font-normal text-base">({learners.length})</span>
+                Learners <span className="text-gray-400 font-normal text-base">({learners.length}{pendingRegistrations.length > 0 ? ` + ${pendingRegistrations.length} pending` : ''})</span>
               </h2>
-              {certifications.filter(c => c.enabled).length > 0 && (
-                <select
-                  value={certFilter}
-                  onChange={e => setCertFilter(e.target.value)}
-                  className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-pendo-pink"
+              <div className="flex items-center gap-2">
+                {certifications.filter(c => c.enabled).length > 0 && (
+                  <select
+                    value={certFilter}
+                    onChange={e => setCertFilter(e.target.value)}
+                    className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-pendo-pink"
+                  >
+                    <option value="all">All Learners</option>
+                    {certifications.filter(c => c.enabled).map(c => (
+                      <option key={c.id} value={c.id}>Has: {c.title}</option>
+                    ))}
+                    {certifications.filter(c => c.enabled).map(c => (
+                      <option key={`missing-${c.id}`} value={`missing-${c.id}`}>Missing: {c.title}</option>
+                    ))}
+                  </select>
+                )}
+                <button
+                  onClick={() => { setShowAddLearner(v => !v); setAddLearnerMsg(null) }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-pendo-pink text-white rounded-lg text-sm font-medium hover:bg-pendo-pink-dark transition-colors"
                 >
-                  <option value="all">All Learners</option>
-                  {certifications.filter(c => c.enabled).map(c => (
-                    <option key={c.id} value={c.id}>Has: {c.title}</option>
-                  ))}
-                  {certifications.filter(c => c.enabled).map(c => (
-                    <option key={`missing-${c.id}`} value={`missing-${c.id}`}>Missing: {c.title}</option>
-                  ))}
-                </select>
-              )}
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add Learner
+                </button>
+              </div>
             </div>
+
+            {/* Add Learner form */}
+            {showAddLearner && (
+              <div className="mb-5 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <p className="text-sm font-medium text-pendo-navy mb-3">Add a learner by email</p>
+                <div className="flex flex-col sm:flex-row gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={newLearnerName}
+                    onChange={e => setNewLearnerName(e.target.value)}
+                    placeholder="Full name (optional)"
+                    className="flex-1 px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-pendo-pink focus:border-transparent outline-none"
+                  />
+                  <input
+                    type="email"
+                    value={newLearnerEmail}
+                    onChange={e => setNewLearnerEmail(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && addLearner()}
+                    placeholder="Email address"
+                    className="flex-1 px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-pendo-pink focus:border-transparent outline-none"
+                  />
+                  <button
+                    onClick={addLearner}
+                    disabled={addingLearner || !newLearnerEmail.trim()}
+                    className="px-4 py-2 bg-pendo-navy text-white rounded-lg text-sm font-medium hover:bg-pendo-navy-light transition-colors disabled:opacity-60 whitespace-nowrap"
+                  >
+                    {addingLearner ? 'Adding…' : 'Add'}
+                  </button>
+                </div>
+                {addLearnerMsg && (
+                  <p className={`text-xs mt-1 ${addLearnerMsg.type === 'success' ? 'text-green-600' : 'text-red-500'}`}>
+                    {addLearnerMsg.text}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Pending registrations */}
+            {pendingRegistrations.length > 0 && (
+              <div className="mb-4">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Pending — awaiting sign-up</p>
+                <div className="space-y-1">
+                  {pendingRegistrations.map(p => (
+                    <div key={p.id} className="flex items-center justify-between py-2 px-3 bg-amber-50 border border-amber-100 rounded-lg">
+                      <div>
+                        {p.full_name && <span className="text-sm font-medium text-gray-700 mr-2">{p.full_name}</span>}
+                        <span className="text-sm text-gray-500 font-mono">{p.email}</span>
+                      </div>
+                      <button
+                        onClick={() => removePendingRegistration(p.id)}
+                        className="text-gray-400 hover:text-red-500 transition-colors ml-3"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {learners.length === 0 ? (
               <p className="text-sm text-gray-400 italic">No learners registered for this partner yet.</p>
             ) : (() => {

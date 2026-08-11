@@ -34,9 +34,10 @@ export function useAuth(): AuthState {
     const ADMIN_EMAILS = ['andrew.wadford@pendo.io', 'gabrielle.vacca@pendo.io', 'adam.goings@pendo.io']
     const isAdmin = ADMIN_EMAILS.includes(email)
 
-    // Find partner by email domain
+    // Find partner by email domain or pending registration
     let partnerId: string | null = null
     if (!isAdmin) {
+      // 1. Check domain mapping
       const domain = email.split('@')[1] ?? ''
       if (domain) {
         const { data: domainRow } = await supabase
@@ -45,6 +46,15 @@ export function useAuth(): AuthState {
           .eq('domain', domain)
           .single()
         partnerId = domainRow?.partner_id ?? null
+      }
+      // 2. Check pending registrations (admin pre-registered this email)
+      if (!partnerId) {
+        const { data: pending } = await supabase
+          .from('lms_pending_registrations')
+          .select('partner_id')
+          .eq('email', email)
+          .single()
+        partnerId = pending?.partner_id ?? null
       }
     }
 
