@@ -18,6 +18,9 @@ export function AdminPartners() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [stageFilter, setStageFilter] = useState<string>('all')
+  const [typeFilter, setTypeFilter] = useState<string>('all')
+  const [pdmFilter, setPdmFilter] = useState<string>('all')
+  const [regionFilter, setRegionFilter] = useState<string>('all')
   const [showAdd, setShowAdd] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<NewPartnerForm>({ name: '', enbl_stage: 'pre', category_types: [], pdm: '' })
@@ -52,10 +55,16 @@ export function AdminPartners() {
     setSaving(false)
   }
 
+  const pdmOptions = Array.from(new Set(partners.map(p => p.pdm).filter(Boolean))).sort() as string[]
+  const regionOptions = Array.from(new Set(partners.map(p => p.region).filter(Boolean))).sort() as string[]
+
   const filtered = partners.filter(p => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase())
     const matchStage = stageFilter === 'all' || p.enbl_stage === stageFilter
-    return matchSearch && matchStage
+    const matchType = typeFilter === 'all' || (p.category_type ?? '').includes(typeFilter)
+    const matchPdm = pdmFilter === 'all' || p.pdm === pdmFilter
+    const matchRegion = regionFilter === 'all' || p.region === regionFilter
+    return matchSearch && matchStage && matchType && matchPdm && matchRegion
   })
 
   return (
@@ -162,7 +171,7 @@ export function AdminPartners() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search partners…"
-            className="px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-pendo-pink focus:border-transparent outline-none w-64"
+            className="px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-pendo-pink focus:border-transparent outline-none w-56"
           />
           <select
             value={stageFilter}
@@ -174,6 +183,46 @@ export function AdminPartners() {
             <option value="active">Active</option>
             <option value="post">Post</option>
           </select>
+          <select
+            value={typeFilter}
+            onChange={e => setTypeFilter(e.target.value)}
+            className="px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-pendo-pink focus:border-transparent outline-none"
+          >
+            <option value="all">All Types</option>
+            {PARTNER_TYPES.map(t => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+          <select
+            value={pdmFilter}
+            onChange={e => setPdmFilter(e.target.value)}
+            className="px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-pendo-pink focus:border-transparent outline-none"
+          >
+            <option value="all">All PDMs</option>
+            {pdmOptions.map(p => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+          {regionOptions.length > 0 && (
+            <select
+              value={regionFilter}
+              onChange={e => setRegionFilter(e.target.value)}
+              className="px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-pendo-pink focus:border-transparent outline-none"
+            >
+              <option value="all">All Regions</option>
+              {regionOptions.map(r => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+          )}
+          {(stageFilter !== 'all' || typeFilter !== 'all' || pdmFilter !== 'all' || regionFilter !== 'all' || search) && (
+            <button
+              onClick={() => { setSearch(''); setStageFilter('all'); setTypeFilter('all'); setPdmFilter('all'); setRegionFilter('all') }}
+              className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 underline"
+            >
+              Clear filters
+            </button>
+          )}
         </div>
 
         {loading ? (
@@ -187,8 +236,9 @@ export function AdminPartners() {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Partner</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Stage</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Category</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">PDM</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Region</th>
                   <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
@@ -208,6 +258,7 @@ export function AdminPartners() {
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">{p.category_type ?? '—'}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{p.pdm ?? '—'}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{p.region ?? '—'}</td>
                     <td className="px-6 py-4 text-right">
                       <Link
                         to={`/admin/partners/${p.id}`}
@@ -220,7 +271,7 @@ export function AdminPartners() {
                 ))}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-gray-400 text-sm">
+                    <td colSpan={6} className="px-6 py-12 text-center text-gray-400 text-sm">
                       No partners match your filters
                     </td>
                   </tr>
