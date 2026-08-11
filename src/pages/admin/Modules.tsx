@@ -298,7 +298,7 @@ export function AdminModules() {
                             <div className="flex items-center justify-between mb-2">
                               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Academy Courses</p>
                               <button
-                                onClick={() => setEditState(s => ({ ...s, academy_courses: [...s.academy_courses, { title: '', url: '' }] }))}
+                                onClick={() => setEditState(s => ({ ...s, academy_courses: [...s.academy_courses, { label: '', url: '' }] }))}
                                 className="text-xs text-pendo-pink font-semibold hover:underline flex items-center gap-1"
                               >
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
@@ -312,8 +312,8 @@ export function AdminModules() {
                               {editState.academy_courses.map((course, i) => (
                                 <div key={i} className="flex gap-2 items-start">
                                   <div className="flex-1 grid grid-cols-2 gap-2">
-                                    <input type="text" value={course.title}
-                                      onChange={e => setEditState(s => ({ ...s, academy_courses: s.academy_courses.map((c, j) => j === i ? { ...c, title: e.target.value } : c) }))}
+                                    <input type="text" value={course.label}
+                                      onChange={e => setEditState(s => ({ ...s, academy_courses: s.academy_courses.map((c, j) => j === i ? { ...c, label: e.target.value } : c) }))}
                                       placeholder="Course label (e.g. Segments Course)"
                                       className="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-pendo-pink" />
                                     <input type="text" value={course.url}
