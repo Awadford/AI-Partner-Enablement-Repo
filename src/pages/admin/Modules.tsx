@@ -32,33 +32,37 @@ export function AdminModules() {
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState<string | null>(null)
 
+  async function loadModules() {
+    const { data } = await supabase
+      .from('lms_modules')
+      .select('*')
+      .order('default_order')
+    setModules((data ?? []) as LmsModule[])
+    setLoading(false)
+  }
+
   useEffect(() => {
-    async function load() {
-      const { data } = await supabase
-        .from('lms_modules')
-        .select('*')
-        .order('default_order')
-      setModules((data ?? []) as LmsModule[])
-      setLoading(false)
-    }
-    load()
+    loadModules()
   }, [])
 
-  function startEdit(mod: LmsModule) {
-    setEditing(mod.id)
+  async function startEdit(mod: LmsModule) {
+    // Re-fetch fresh data before opening edit form
+    const { data: fresh } = await supabase.from('lms_modules').select('*').eq('id', mod.id).single()
+    const m = (fresh as LmsModule) ?? mod
+    setEditing(m.id)
     setEditState({
-      video_url: mod.content?.video_url ?? '',
-      video_url_extension: mod.content?.video_url_extension ?? '',
-      docs: mod.content?.docs?.map((d: DocItem) => ({ ...d })) ?? [],
-      recordings: mod.content?.recordings?.map((r: DocItem) => ({ ...r })) ?? [],
-      exec_url: mod.content?.exec_url ?? '',
-      exec_prompt: mod.content?.exec_prompt ?? '',
-      iframe_url: mod.content?.iframe_url ?? '',
+      video_url: m.content?.video_url ?? '',
+      video_url_extension: m.content?.video_url_extension ?? '',
+      docs: m.content?.docs?.map((d: DocItem) => ({ ...d })) ?? [],
+      recordings: m.content?.recordings?.map((r: DocItem) => ({ ...r })) ?? [],
+      exec_url: m.content?.exec_url ?? '',
+      exec_prompt: m.content?.exec_prompt ?? '',
+      iframe_url: m.content?.iframe_url ?? '',
       iframe_overrides: {
-        video: mod.content?.iframe_overrides?.video ?? false,
-        resources: mod.content?.iframe_overrides?.resources ?? false,
-        recordings: mod.content?.iframe_overrides?.recordings ?? false,
-        exec: mod.content?.iframe_overrides?.exec ?? false,
+        video: m.content?.iframe_overrides?.video ?? false,
+        resources: m.content?.iframe_overrides?.resources ?? false,
+        recordings: m.content?.iframe_overrides?.recordings ?? false,
+        exec: m.content?.iframe_overrides?.exec ?? false,
       },
     })
   }
@@ -167,8 +171,8 @@ export function AdminModules() {
                         <div className="text-xs text-gray-500">Recordings</div>
                       </div>
                       <div className="bg-white rounded-lg border border-gray-200 p-3">
-                        <div className="text-xl font-bold text-pendo-navy">{mod.content?.scenario ? '✓' : '—'}</div>
-                        <div className="text-xs text-gray-500">Scenario</div>
+                        <div className="text-xl font-bold text-pendo-navy">{mod.content?.exec_url ? '✓' : '—'}</div>
+                        <div className="text-xs text-gray-500">exec.com</div>
                       </div>
                       <div className="bg-white rounded-lg border border-gray-200 p-3">
                         <div className="text-xl font-bold text-pendo-navy">{mod.content?.video_url ? '✓' : '—'}</div>

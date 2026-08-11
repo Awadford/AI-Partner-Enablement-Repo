@@ -31,7 +31,7 @@ export function useAuth(): AuthState {
 
     // Profile doesn't exist — create one
     const email = u.email ?? ''
-    const ADMIN_EMAILS = ['andrew.wadford@pendo.io', 'gabrielle.vacca@pendo.io']
+    const ADMIN_EMAILS = ['andrew.wadford@pendo.io', 'gabrielle.vacca@pendo.io', 'adam.goings@pendo.io']
     const isAdmin = ADMIN_EMAILS.includes(email)
 
     // Find partner by email domain
