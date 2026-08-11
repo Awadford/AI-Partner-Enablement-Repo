@@ -73,7 +73,7 @@ export function AdminPartnerDetail() {
 
     const p = partnerRes.data as Partner
     setPartner(p)
-    setEditPartner({ name: p.name, notes: p.notes ?? '', enbl_stage: p.enbl_stage })
+    setEditPartner({ name: p.name, notes: p.notes ?? '', enbl_stage: p.enbl_stage, pdm: p.pdm ?? '', region: p.region ?? '' })
     setDomains((domainsRes.data ?? []) as LmsPartnerDomain[])
 
     const pmMap: Record<string, LmsPartnerModule> = {}
@@ -137,6 +137,8 @@ export function AdminPartnerDetail() {
       name: editPartner.name,
       notes: editPartner.notes,
       enbl_stage: editPartner.enbl_stage,
+      pdm: editPartner.pdm || null,
+      region: editPartner.region || null,
     }).eq('id', partnerId)
     setSaving(false)
     if (!error) {
@@ -359,6 +361,26 @@ export function AdminPartnerDetail() {
                   <option value="active">Active</option>
                   <option value="post">Post</option>
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">PDM Contact</label>
+                <input
+                  type="text"
+                  value={editPartner.pdm ?? ''}
+                  onChange={e => setEditPartner(prev => ({ ...prev, pdm: e.target.value }))}
+                  placeholder="e.g. Jane Smith"
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-pendo-pink focus:border-transparent outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Region</label>
+                <input
+                  type="text"
+                  value={editPartner.region ?? ''}
+                  onChange={e => setEditPartner(prev => ({ ...prev, region: e.target.value }))}
+                  placeholder="e.g. North America"
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-pendo-pink focus:border-transparent outline-none"
+                />
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
@@ -628,77 +650,49 @@ export function AdminPartnerDetail() {
                     <thead>
                       <tr className="border-b border-gray-100">
                         <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-4">Name</th>
-                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-4">Title</th>
                         <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-4">Email</th>
-                        {enabledCerts.map(c => (
-                          <th key={c.id} className="text-center text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 px-2 max-w-[80px]">
-                            <span className="block truncate" title={c.title}>{c.title.replace('Pendo Essentials for ', '').replace('Pendo for ', '')}</span>
+                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-4">Role</th>
+                        {enabledCerts.length > 0 && (
+                          <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-2" colSpan={enabledCerts.length}>
+                            Pendo Certifications
                           </th>
-                        ))}
-                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pl-4">Module Progress</th>
+                        )}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {filtered.map(l => {
-                        const enabledModules = modules.filter(m => m.pm?.enabled)
-                        return (
+                      {filtered.map(l => (
                         <tr key={l.id} className="hover:bg-gray-50">
                           <td className="py-3 pr-4">
                             <span className="font-medium text-pendo-navy text-sm">{l.full_name ?? '—'}</span>
                           </td>
                           <td className="py-3 pr-4">
-                            <span className="text-sm text-gray-500">{l.title ?? '—'}</span>
-                          </td>
-                          <td className="py-3 pr-4">
                             <span className="text-sm text-gray-500">{l.email}</span>
                           </td>
+                          <td className="py-3 pr-4">
+                            <span className="text-sm text-gray-500">{l.title ?? '—'}</span>
+                          </td>
                           {enabledCerts.map(c => (
-                            <td key={c.id} className="py-3 px-2 text-center">
+                            <td key={c.id} className="py-3 pr-2">
                               <button
                                 onClick={() => toggleUserCert(l, c.id)}
-                                title={l.earnedCertIds.has(c.id) ? 'Mark as not completed' : 'Mark as completed'}
-                                className={`w-6 h-6 rounded-full flex items-center justify-center mx-auto transition-colors
+                                title={`${c.title}: ${l.earnedCertIds.has(c.id) ? 'Earned — click to remove' : 'Not earned — click to mark complete'}`}
+                                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium transition-colors
                                   ${l.earnedCertIds.has(c.id)
-                                    ? 'bg-green-100 text-green-600 hover:bg-green-200'
-                                    : 'bg-gray-100 text-gray-300 hover:bg-gray-200'}`}
+                                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
                               >
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                                 </svg>
+                                <span className="truncate max-w-[100px]">{c.title.replace('Pendo Essentials for ', '').replace('Pendo Certification: ', '').replace('Pendo for ', '')}</span>
                               </button>
                             </td>
                           ))}
-                          <td className="py-3 pl-4">
-                            <div className="flex items-center gap-1 flex-wrap">
-                              {enabledModules.map(m => {
-                                const status = l.moduleProgress[m.id] ?? 'not_started'
-                                const colors = {
-                                  completed: 'bg-green-500',
-                                  in_progress: 'bg-amber-400',
-                                  not_started: 'bg-gray-200',
-                                }
-                                const labels = {
-                                  completed: 'Completed',
-                                  in_progress: 'In Progress',
-                                  not_started: 'Not Started',
-                                }
-                                return (
-                                  <div
-                                    key={m.id}
-                                    title={`${m.title}: ${labels[status]}`}
-                                    className={`w-3 h-3 rounded-full flex-shrink-0 ${colors[status]}`}
-                                  />
-                                )
-                              })}
-                              <span className="text-xs text-gray-400 ml-1">{l.completed}/{l.total}</span>
-                            </div>
-                          </td>
                         </tr>
-                        )
-                      })}
+                      ))}
                       {filtered.length === 0 && (
                         <tr>
-                          <td colSpan={4 + enabledCerts.length} className="py-8 text-center text-sm text-gray-400 italic">
+                          <td colSpan={3 + enabledCerts.length} className="py-8 text-center text-sm text-gray-400 italic">
                             No learners match this filter.
                           </td>
                         </tr>

@@ -4,6 +4,7 @@ export interface Partner {
   enbl_stage: 'pre' | 'active' | 'post'
   category_type: string | null
   pdm: string | null
+  region: string | null
   notes: string | null
 }
 
