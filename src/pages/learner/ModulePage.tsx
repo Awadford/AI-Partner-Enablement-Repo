@@ -212,11 +212,18 @@ export function ModulePage() {
   const content = module.content ?? {}
   const docs: ModuleDoc[] = content.docs ?? []
   const recordings: ModuleRecording[] = content.recordings ?? []
-  const iframeUrl = content.iframe_url
-  const overrides = content.iframe_overrides ?? {}
+  const iframeUrls = content.iframe_urls ?? {}
+  const legacyIframeUrl = content.iframe_url
+  const legacyOverrides = content.iframe_overrides ?? {}
+  // Per-section URL: prefer iframe_urls.{section}, fall back to legacy iframe_url if that section is toggled on
+  const sectionIframe = (section: 'video' | 'resources' | 'recordings' | 'exec'): string | null =>
+    iframeUrls[section] || (legacyOverrides[section] ? legacyIframeUrl ?? null : null)
+  // Keep legacy aliases for components that still use them
+  const iframeUrl = legacyIframeUrl
+  const overrides = legacyOverrides
 
   // Renders the Academy/iframe embed used when a section is overridden
-  const IframeEmbed = ({ title }: { title: string }) => {
+  const IframeEmbed = ({ title, url }: { title: string; url: string }) => {
     const [failed, setFailed] = useState(false)
     // Detect embed block via timeout — X-Frame-Options errors don't fire onError on iframes
     const [timedOut, setTimedOut] = useState(false)
@@ -235,7 +242,7 @@ export function ModulePage() {
             <p className="text-sm text-gray-500 max-w-xs">This content can't be embedded — click below to open it in a new tab.</p>
           </div>
           <button
-            onClick={() => window.open(iframeUrl!, '_blank')}
+            onClick={() => window.open(url, '_blank')}
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-pendo-pink text-white font-semibold rounded-xl hover:bg-opacity-90 transition-colors text-sm"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -254,7 +261,7 @@ export function ModulePage() {
           </div>
         )}
         <iframe
-          src={iframeUrl!}
+          src={url}
           title={title}
           className="w-full h-full"
           allow="fullscreen; autoplay"
@@ -309,7 +316,7 @@ export function ModulePage() {
         <div className="space-y-4">
           {/* 1. Learn — Video */}
           <Section
-            title={iframeUrl && overrides.video ? 'Academy Course' : 'Learn — Overview Video'}
+            title={sectionIframe('video') ? 'Academy Course' : 'Learn — Overview Video'}
             icon={
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
@@ -317,8 +324,8 @@ export function ModulePage() {
               </svg>
             }
           >
-            {iframeUrl && overrides.video ? (
-              <IframeEmbed title={`${module.title} — Academy Course`} />
+            {sectionIframe('video') ? (
+              <IframeEmbed title={`${module.title} — Academy Course`} url={sectionIframe('video')!} />
             ) : content.video_url ? (
               content.video_url_extension ? (
                 // Two install paths — tabbed
@@ -343,17 +350,17 @@ export function ModulePage() {
           </Section>
 
           {/* 2. Resources */}
-          {(docs.length > 0 || (iframeUrl && overrides.resources)) && (
+          {(docs.length > 0 || sectionIframe('resources')) && (
             <Section
-              title={iframeUrl && overrides.resources ? 'Academy Course' : 'Resources'}
+              title={sectionIframe('resources') ? 'Academy Course' : 'Resources'}
               icon={
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               }
             >
-              {iframeUrl && overrides.resources ? (
-                <IframeEmbed title={`${module.title} — Resources`} />
+              {sectionIframe('resources') ? (
+                <IframeEmbed title={`${module.title} — Resources`} url={sectionIframe('resources')!} />
               ) : (<>
               <button
                 onClick={() => setDocsOpen(o => !o)}
@@ -412,17 +419,17 @@ export function ModulePage() {
           )}
 
           {/* 4. Watch — Customer Recordings */}
-          {(recordings.length > 0 || (iframeUrl && overrides.recordings)) && (
+          {(recordings.length > 0 || sectionIframe('recordings')) && (
             <Section
-              title={iframeUrl && overrides.recordings ? 'Academy Course' : 'Watch — Customer Recordings'}
+              title={sectionIframe('recordings') ? 'Academy Course' : 'Watch — Customer Recordings'}
               icon={
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.263a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
               }
             >
-              {iframeUrl && overrides.recordings ? (
-                <IframeEmbed title={`${module.title} — Recordings`} />
+              {sectionIframe('recordings') ? (
+                <IframeEmbed title={`${module.title} — Recordings`} url={sectionIframe('recordings')!} />
               ) : (
               <ul className="space-y-3">
                 {recordings.map((rec, i) => (
@@ -463,17 +470,17 @@ export function ModulePage() {
           )}
 
           {/* 5. Record — exec.com */}
-          {(content.exec_prompt || content.exec_url || (iframeUrl && overrides.exec)) && (
+          {(content.exec_prompt || content.exec_url || sectionIframe('exec')) && (
             <Section
-              title={iframeUrl && overrides.exec ? 'Academy Course' : 'Record — Practice with exec.com'}
+              title={sectionIframe('exec') ? 'Academy Course' : 'Record — Practice with exec.com'}
               icon={
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                 </svg>
               }
             >
-              {iframeUrl && overrides.exec ? (
-                <IframeEmbed title={`${module.title} — Practice`} />
+              {sectionIframe('exec') ? (
+                <IframeEmbed title={`${module.title} — Practice`} url={sectionIframe('exec')!} />
               ) : (<>
               {/* Prompt / instructions always shown if present */}
               {content.exec_prompt && (

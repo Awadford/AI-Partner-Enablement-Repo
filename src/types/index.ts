@@ -72,8 +72,14 @@ export interface ModuleContent {
   exec_prompt?: string
   exec_url?: string | null
   step_guide?: StepGuide | null
-  iframe_url?: string | null       // Academy/external course to embed
-  iframe_overrides?: IframeOverrides  // which sections the iframe replaces
+  iframe_url?: string | null       // Legacy: single iframe URL
+  iframe_overrides?: IframeOverrides  // Legacy: which sections the iframe replaces
+  iframe_urls?: {                  // Per-section iframe URLs (overrides iframe_url)
+    video?: string | null
+    resources?: string | null
+    recordings?: string | null
+    exec?: string | null
+  }
 }
 
 export interface LmsModule {
