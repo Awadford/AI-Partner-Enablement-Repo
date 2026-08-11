@@ -607,36 +607,9 @@ export function AdminPartnerDetail() {
               </div>
             )}
 
-            {/* Pending registrations */}
-            {pendingRegistrations.length > 0 && (
-              <div className="mb-4">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Pending — awaiting sign-up</p>
-                <div className="space-y-1">
-                  {pendingRegistrations.map(p => (
-                    <div key={p.id} className="flex items-center justify-between py-2 px-3 bg-amber-50 border border-amber-100 rounded-lg">
-                      <div>
-                        {p.full_name && <span className="text-sm font-medium text-gray-700 mr-2">{p.full_name}</span>}
-                        <span className="text-sm text-gray-500 font-mono">{p.email}</span>
-                      </div>
-                      <button
-                        onClick={() => removePendingRegistration(p.id)}
-                        className="text-gray-400 hover:text-red-500 transition-colors ml-3"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {learners.length === 0 ? (
-              <p className="text-sm text-gray-400 italic">No learners registered for this partner yet.</p>
-            ) : (() => {
+            {(() => {
               const enabledCerts = certifications.filter(c => c.enabled)
-              const filtered = learners.filter(l => {
+              const filteredLearners = learners.filter(l => {
                 if (certFilter === 'all') return true
                 if (certFilter.startsWith('missing-')) {
                   const cId = certFilter.replace('missing-', '')
@@ -644,23 +617,27 @@ export function AdminPartnerDetail() {
                 }
                 return l.earnedCertIds.has(certFilter)
               })
+              const totalCols = 4 + enabledCerts.length
+
               return (
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[600px]">
                     <thead>
-                      <tr className="border-b border-gray-100">
+                      <tr className="border-b border-gray-200">
                         <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-4">Name</th>
                         <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-4">Email</th>
-                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-4">Role</th>
-                        {enabledCerts.length > 0 && (
-                          <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-2" colSpan={enabledCerts.length}>
-                            Pendo Certifications
+                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-4">Title</th>
+                        {enabledCerts.map(c => (
+                          <th key={c.id} className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-4">
+                            {c.title.replace('Pendo Essentials for ', '').replace('Pendo Certification: ', '').replace('Pendo for ', '')}
                           </th>
-                        )}
+                        ))}
+                        <th className="pb-2 w-8" />
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {filtered.map(l => (
+                      {/* Active learners */}
+                      {filteredLearners.map(l => (
                         <tr key={l.id} className="hover:bg-gray-50">
                           <td className="py-3 pr-4">
                             <span className="font-medium text-pendo-navy text-sm">{l.full_name ?? '—'}</span>
@@ -672,11 +649,11 @@ export function AdminPartnerDetail() {
                             <span className="text-sm text-gray-500">{l.title ?? '—'}</span>
                           </td>
                           {enabledCerts.map(c => (
-                            <td key={c.id} className="py-3 pr-2">
+                            <td key={c.id} className="py-3 pr-4">
                               <button
                                 onClick={() => toggleUserCert(l, c.id)}
-                                title={`${c.title}: ${l.earnedCertIds.has(c.id) ? 'Earned — click to remove' : 'Not earned — click to mark complete'}`}
-                                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium transition-colors
+                                title={l.earnedCertIds.has(c.id) ? 'Earned — click to remove' : 'Not earned — click to mark complete'}
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors
                                   ${l.earnedCertIds.has(c.id)
                                     ? 'bg-green-100 text-green-700 hover:bg-green-200'
                                     : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
@@ -684,16 +661,64 @@ export function AdminPartnerDetail() {
                                 <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                                 </svg>
-                                <span className="truncate max-w-[100px]">{c.title.replace('Pendo Essentials for ', '').replace('Pendo Certification: ', '').replace('Pendo for ', '')}</span>
+                                {l.earnedCertIds.has(c.id) ? 'Earned' : 'Not earned'}
                               </button>
                             </td>
                           ))}
+                          <td className="py-3 w-8" />
                         </tr>
                       ))}
-                      {filtered.length === 0 && (
+
+                      {/* Pending registrations */}
+                      {pendingRegistrations.length > 0 && (
+                        <>
+                          <tr>
+                            <td colSpan={totalCols} className="pt-4 pb-1">
+                              <span className="text-xs font-semibold text-amber-600 uppercase tracking-wider">Pending — awaiting sign-up</span>
+                            </td>
+                          </tr>
+                          {pendingRegistrations.map(p => (
+                            <tr key={p.id} className="bg-amber-50 hover:bg-amber-100 transition-colors">
+                              <td className="py-3 pr-4">
+                                <span className="font-medium text-gray-700 text-sm">{p.full_name ?? '—'}</span>
+                              </td>
+                              <td className="py-3 pr-4">
+                                <span className="text-sm text-gray-500 font-mono">{p.email}</span>
+                              </td>
+                              <td className="py-3 pr-4">
+                                <span className="text-xs text-amber-600">Pending sign-up</span>
+                              </td>
+                              {enabledCerts.map(c => (
+                                <td key={c.id} className="py-3 pr-4">
+                                  <span className="text-gray-300 text-xs">—</span>
+                                </td>
+                              ))}
+                              <td className="py-3 w-8">
+                                <button
+                                  onClick={() => removePendingRegistration(p.id)}
+                                  className="text-gray-400 hover:text-red-500 transition-colors"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </>
+                      )}
+
+                      {filteredLearners.length === 0 && pendingRegistrations.length === 0 && (
                         <tr>
-                          <td colSpan={3 + enabledCerts.length} className="py-8 text-center text-sm text-gray-400 italic">
-                            No learners match this filter.
+                          <td colSpan={totalCols} className="py-8 text-center text-sm text-gray-400 italic">
+                            No learners yet.
+                          </td>
+                        </tr>
+                      )}
+                      {filteredLearners.length === 0 && certFilter !== 'all' && (
+                        <tr>
+                          <td colSpan={totalCols} className="py-4 text-center text-sm text-gray-400 italic">
+                            No active learners match this filter.
                           </td>
                         </tr>
                       )}
