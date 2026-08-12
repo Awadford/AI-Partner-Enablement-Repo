@@ -89,7 +89,7 @@ export interface LmsModule {
   slug: string
   title: string
   description: string
-  category: 'delivery' | 'product' | 'services'
+  category: 'delivery' | 'product' | 'services' | 'gtm'
   default_order: number
   content: ModuleContent
   created_at: string
