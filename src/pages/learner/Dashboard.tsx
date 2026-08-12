@@ -120,7 +120,7 @@ export function LearnerDashboard() {
     )
   }
 
-  if (!profile?.partner_id) {
+  if (!profile?.is_admin && !profile?.partner_id) {
     return (
       <Layout>
         <div className="max-w-2xl mx-auto py-16 px-4 text-center">
