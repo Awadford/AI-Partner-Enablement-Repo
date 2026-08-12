@@ -24,6 +24,8 @@ interface PendingRegistration {
   id: string
   email: string
   full_name: string | null
+  title: string | null
+  certifications: string[]
   created_at: string
 }
 
@@ -50,6 +52,8 @@ export function AdminPartnerDetail() {
   const [newLearnerName, setNewLearnerName] = useState('')
   const [addingLearner, setAddingLearner] = useState(false)
   const [addLearnerMsg, setAddLearnerMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [csvImporting, setCsvImporting] = useState(false)
+  const [csvMsg, setCsvMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const [loading, setLoading] = useState(true)
 
@@ -229,6 +233,53 @@ export function AdminPartnerDetail() {
   const removePendingRegistration = async (id: string) => {
     const { error } = await supabase.from('lms_pending_registrations').delete().eq('id', id)
     if (!error) setPendingRegistrations(prev => prev.filter(p => p.id !== id))
+  }
+
+  const handleCertCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setCsvImporting(true)
+    setCsvMsg(null)
+    e.target.value = ''
+
+    const text = await file.text()
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
+    if (lines.length < 2) { setCsvMsg({ type: 'error', text: 'CSV must have a header row and at least one data row.' }); setCsvImporting(false); return }
+
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/^"|"$/g, ''))
+    const emailIdx = headers.findIndex(h => h === 'email')
+    if (emailIdx === -1) { setCsvMsg({ type: 'error', text: 'CSV must have an "Email" column.' }); setCsvImporting(false); return }
+
+    // Collect all cert columns (every column that isn't email/name/title)
+    const certColIdxs = headers.map((_h, i) => i).filter(i => i !== emailIdx && !['name', 'full name', 'title', 'role'].includes(headers[i]))
+
+    // Build email → certs map
+    const certMap: Record<string, string[]> = {}
+    for (const line of lines.slice(1)) {
+      const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''))
+      const email = cols[emailIdx]?.toLowerCase()
+      if (!email) continue
+      const certs = certColIdxs.map(i => cols[i]).filter(Boolean)
+      if (!certMap[email]) certMap[email] = []
+      certMap[email].push(...certs)
+    }
+
+    // Update matching contacts
+    let updated = 0
+    for (const contact of pendingRegistrations) {
+      const certs = certMap[contact.email.toLowerCase()]
+      if (!certs || certs.length === 0) continue
+      const merged = Array.from(new Set([...(contact.certifications ?? []), ...certs]))
+      const { error } = await supabase
+        .from('lms_pending_registrations')
+        .update({ certifications: merged })
+        .eq('id', contact.id)
+      if (!error) updated++
+    }
+
+    setCsvMsg({ type: 'success', text: `Updated certifications for ${updated} contact${updated !== 1 ? 's' : ''}.` })
+    await loadData()
+    setCsvImporting(false)
   }
 
   const toggleUserCert = async (learner: LearnerRow, certId: string) => {
@@ -546,7 +597,7 @@ export function AdminPartnerDetail() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-semibold text-pendo-navy text-lg">
-                Learners <span className="text-gray-400 font-normal text-base">({learners.length}{pendingRegistrations.length > 0 ? ` + ${pendingRegistrations.length} pending` : ''})</span>
+                Learners <span className="text-gray-400 font-normal text-base">({learners.length + pendingRegistrations.length})</span>
               </h2>
               <div className="flex items-center gap-2">
                 {certifications.filter(c => c.enabled).length > 0 && (
@@ -564,6 +615,13 @@ export function AdminPartnerDetail() {
                     ))}
                   </select>
                 )}
+                <label className={`flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium cursor-pointer transition-colors ${csvImporting ? 'opacity-50 pointer-events-none' : 'hover:bg-gray-50'}`}>
+                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  {csvImporting ? 'Importing…' : 'Import Certs'}
+                  <input type="file" accept=".csv" className="hidden" onChange={handleCertCsv} />
+                </label>
                 <button
                   onClick={() => { setShowAddLearner(v => !v); setAddLearnerMsg(null) }}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-pendo-pink text-white rounded-lg text-sm font-medium hover:bg-pendo-pink-dark transition-colors"
@@ -575,6 +633,9 @@ export function AdminPartnerDetail() {
                 </button>
               </div>
             </div>
+            {csvMsg && (
+              <p className={`text-xs mb-3 ${csvMsg.type === 'success' ? 'text-green-600' : 'text-red-500'}`}>{csvMsg.text}</p>
+            )}
 
             {/* Add Learner form */}
             {showAddLearner && (
@@ -674,56 +735,49 @@ export function AdminPartnerDetail() {
                         </tr>
                       ))}
 
-                      {/* Pending registrations */}
-                      {pendingRegistrations.length > 0 && (
-                        <>
-                          <tr>
-                            <td colSpan={totalCols} className="pt-4 pb-1">
-                              <span className="text-xs font-semibold text-amber-600 uppercase tracking-wider">Pending — awaiting sign-up</span>
-                            </td>
-                          </tr>
-                          {pendingRegistrations.map(p => (
-                            <tr key={p.id} className="bg-amber-50 hover:bg-amber-100 transition-colors">
-                              <td className="py-3 pr-4">
-                                <span className="font-medium text-gray-700 text-sm">{p.full_name ?? '—'}</span>
-                              </td>
-                              <td className="py-3 pr-4">
-                                <span className="text-sm text-gray-500 font-mono">{p.email}</span>
-                              </td>
-                              <td className="py-3 pr-4">
-                                <span className="text-xs text-amber-600">Pending sign-up</span>
-                              </td>
-                              {enabledCerts.map(c => (
-                                <td key={c.id} className="py-3 pr-4">
-                                  <span className="text-gray-300 text-xs">—</span>
-                                </td>
-                              ))}
-                              <td className="py-3 w-8">
-                                <button
-                                  onClick={() => removePendingRegistration(p.id)}
-                                  className="text-gray-400 hover:text-red-500 transition-colors"
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      {/* Contacts (not yet signed in) */}
+                      {pendingRegistrations.map(p => (
+                        <tr key={p.id} className="hover:bg-gray-50">
+                          <td className="py-3 pr-4">
+                            <span className="font-medium text-pendo-navy text-sm">{p.full_name ?? '—'}</span>
+                          </td>
+                          <td className="py-3 pr-4">
+                            <span className="text-sm text-gray-500">{p.email}</span>
+                          </td>
+                          <td className="py-3 pr-4">
+                            <span className="text-sm text-gray-500">{p.title ?? '—'}</span>
+                          </td>
+                          {enabledCerts.map(c => (
+                            <td key={c.id} className="py-3 pr-4">
+                              {(p.certifications ?? []).some(name => name.toLowerCase() === c.title.toLowerCase()) ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                                   </svg>
-                                </button>
-                              </td>
-                            </tr>
+                                  Earned
+                                </span>
+                              ) : (
+                                <span className="text-gray-300 text-xs">—</span>
+                              )}
+                            </td>
                           ))}
-                        </>
-                      )}
+                          <td className="py-3 w-8">
+                            <button
+                              onClick={() => removePendingRegistration(p.id)}
+                              className="text-gray-300 hover:text-red-500 transition-colors"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
 
                       {filteredLearners.length === 0 && pendingRegistrations.length === 0 && (
                         <tr>
                           <td colSpan={totalCols} className="py-8 text-center text-sm text-gray-400 italic">
                             No learners yet.
-                          </td>
-                        </tr>
-                      )}
-                      {filteredLearners.length === 0 && certFilter !== 'all' && (
-                        <tr>
-                          <td colSpan={totalCols} className="py-4 text-center text-sm text-gray-400 italic">
-                            No active learners match this filter.
                           </td>
                         </tr>
                       )}

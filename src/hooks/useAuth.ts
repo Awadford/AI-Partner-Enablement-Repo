@@ -36,6 +36,8 @@ export function useAuth(): AuthState {
 
     // Find partner by email domain or pending registration
     let partnerId: string | null = null
+    type PendingRec = { id: string; partner_id: string; full_name: string | null; certifications: string[] }
+    let pendingRecord: PendingRec | null = null
     if (!isAdmin) {
       // 1. Check domain mapping
       const domain = email.split('@')[1] ?? ''
@@ -51,17 +53,20 @@ export function useAuth(): AuthState {
       if (!partnerId) {
         const { data: pending } = await supabase
           .from('lms_pending_registrations')
-          .select('partner_id')
+          .select('id, partner_id, full_name, certifications')
           .eq('email', email)
           .single()
-        partnerId = pending?.partner_id ?? null
+        if (pending?.partner_id) {
+          partnerId = pending.partner_id
+          pendingRecord = pending as unknown as PendingRec
+        }
       }
     }
 
     const newProfile: Omit<LmsProfile, 'created_at' | 'updated_at'> = {
       id: u.id,
       email,
-      full_name: u.user_metadata?.full_name ?? null,
+      full_name: u.user_metadata?.full_name ?? (pendingRecord?.full_name ?? null),
       title: null,
       partner_id: partnerId,
       is_admin: isAdmin,
@@ -85,6 +90,52 @@ export function useAuth(): AuthState {
       }
       console.error('Error creating profile:', createError)
       return null
+    }
+
+    // If they came from a pending registration, auto-complete delivery modules + transfer certs
+    if (created && pendingRecord && partnerId) {
+      // 1. Mark all enabled delivery modules as completed
+      const { data: pmRows } = await supabase
+        .from('lms_partner_modules')
+        .select('module_id, lms_modules(category)')
+        .eq('partner_id', partnerId)
+        .eq('enabled', true)
+
+      const deliveryModuleIds = ((pmRows ?? []) as any[])
+        .filter(pm => pm.lms_modules?.category === 'delivery')
+        .map(pm => pm.module_id as string)
+
+      if (deliveryModuleIds.length > 0) {
+        const now = new Date().toISOString()
+        await supabase.from('lms_user_progress').insert(
+          deliveryModuleIds.map(moduleId => ({
+            user_id: created.id,
+            module_id: moduleId,
+            status: 'completed',
+            started_at: now,
+            completed_at: now,
+          }))
+        )
+      }
+
+      // 2. Transfer any pre-loaded certifications by matching cert names
+      const certNames: string[] = pendingRecord.certifications ?? []
+      if (certNames.length > 0) {
+        const { data: allCerts } = await supabase.from('lms_certifications').select('id, title')
+        const certMap = Object.fromEntries(
+          ((allCerts ?? []) as { id: string; title: string }[]).map(c => [c.title.toLowerCase(), c.id])
+        )
+        const certInserts = certNames
+          .map(name => certMap[name.toLowerCase()])
+          .filter(Boolean)
+          .map(certId => ({ user_id: created.id, certification_id: certId }))
+        if (certInserts.length > 0) {
+          await supabase.from('lms_user_certifications').insert(certInserts)
+        }
+      }
+
+      // 3. Remove the pending registration
+      await supabase.from('lms_pending_registrations').delete().eq('id', pendingRecord.id)
     }
 
     return created as LmsProfile
