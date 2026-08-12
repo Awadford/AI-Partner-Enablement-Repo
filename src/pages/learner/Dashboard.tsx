@@ -20,7 +20,34 @@ export function LearnerDashboard() {
 
   useEffect(() => {
     async function load() {
-      if (!profile?.partner_id) {
+      if (!profile) {
+        setLoading(false)
+        return
+      }
+
+      if (profile.is_admin) {
+        // Admins see all modules, all unlocked, ordered by category + default_order
+        const { data: allModules } = await supabase
+          .from('lms_modules')
+          .select('*')
+          .order('category', { ascending: true })
+          .order('default_order', { ascending: true })
+
+        if (allModules) {
+          const withProgress: ModuleWithProgress[] = (allModules as LmsModule[]).map((mod, idx) => ({
+            ...mod,
+            order_index: idx,
+            enabled: true,
+            status: progress[mod.id]?.status ?? 'not_started',
+            locked: false,
+          }))
+          setModules(withProgress)
+        }
+        setLoading(false)
+        return
+      }
+
+      if (!profile.partner_id) {
         setLoading(false)
         return
       }
@@ -64,7 +91,7 @@ export function LearnerDashboard() {
             const mod = row.lms_modules
             const prog = progress[mod.id]
             const status = prog?.status ?? 'not_started'
-            const locked = !profile?.is_admin && idx > 0 && (progress[pmRows[idx - 1].module_id]?.status !== 'completed')
+            const locked = idx > 0 && (progress[pmRows[idx - 1].module_id]?.status !== 'completed')
             return {
               ...mod,
               order_index: row.order_index,
