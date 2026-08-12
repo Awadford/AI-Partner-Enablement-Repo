@@ -55,6 +55,12 @@ export function AdminPartnerDetail() {
   const [csvImporting, setCsvImporting] = useState(false)
   const [csvMsg, setCsvMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
+  // Inline learner editing
+  const [editingRowId, setEditingRowId] = useState<string | null>(null)
+  const [editingRowType, setEditingRowType] = useState<'learner' | 'pending' | null>(null)
+  const [editDraft, setEditDraft] = useState<{ full_name: string; title: string; email: string }>({ full_name: '', title: '', email: '' })
+  const [savingRow, setSavingRow] = useState(false)
+
   const [loading, setLoading] = useState(true)
 
   const loadData = useCallback(async () => {
@@ -233,6 +239,50 @@ export function AdminPartnerDetail() {
   const removePendingRegistration = async (id: string) => {
     const { error } = await supabase.from('lms_pending_registrations').delete().eq('id', id)
     if (!error) setPendingRegistrations(prev => prev.filter(p => p.id !== id))
+  }
+
+  const startEditRow = (id: string, type: 'learner' | 'pending', full_name: string | null, title: string | null, email: string) => {
+    setEditingRowId(id)
+    setEditingRowType(type)
+    setEditDraft({ full_name: full_name ?? '', title: title ?? '', email })
+  }
+
+  const cancelEditRow = () => {
+    setEditingRowId(null)
+    setEditingRowType(null)
+  }
+
+  const saveEditRow = async () => {
+    if (!editingRowId || !editingRowType) return
+    setSavingRow(true)
+    if (editingRowType === 'learner') {
+      const { error } = await supabase.from('lms_profiles').update({
+        full_name: editDraft.full_name || null,
+        title: editDraft.title || null,
+        email: editDraft.email,
+      }).eq('id', editingRowId)
+      if (!error) {
+        setLearners(prev => prev.map(l => l.id === editingRowId
+          ? { ...l, full_name: editDraft.full_name || null, title: editDraft.title || null, email: editDraft.email }
+          : l))
+        setEditingRowId(null)
+        setEditingRowType(null)
+      }
+    } else {
+      const { error } = await supabase.from('lms_pending_registrations').update({
+        full_name: editDraft.full_name || null,
+        title: editDraft.title || null,
+        email: editDraft.email,
+      }).eq('id', editingRowId)
+      if (!error) {
+        setPendingRegistrations(prev => prev.map(p => p.id === editingRowId
+          ? { ...p, full_name: editDraft.full_name || null, title: editDraft.title || null, email: editDraft.email }
+          : p))
+        setEditingRowId(null)
+        setEditingRowType(null)
+      }
+    }
+    setSavingRow(false)
   }
 
   const handleCertCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -703,76 +753,157 @@ export function AdminPartnerDetail() {
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {/* Active learners */}
-                      {filteredLearners.map(l => (
-                        <tr key={l.id} className="hover:bg-gray-50">
-                          <td className="py-3 pr-4">
-                            <span className="font-medium text-pendo-navy text-sm">{l.full_name ?? '—'}</span>
-                          </td>
-                          <td className="py-3 pr-4">
-                            <span className="text-sm text-gray-500">{l.email}</span>
-                          </td>
-                          <td className="py-3 pr-4">
-                            <span className="text-sm text-gray-500">{l.title ?? '—'}</span>
-                          </td>
-                          {enabledCerts.map(c => (
-                            <td key={c.id} className="py-3 pr-4">
-                              <button
-                                onClick={() => toggleUserCert(l, c.id)}
-                                title={l.earnedCertIds.has(c.id) ? 'Earned — click to remove' : 'Not earned — click to mark complete'}
-                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors
-                                  ${l.earnedCertIds.has(c.id)
-                                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
-                              >
-                                <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                                </svg>
-                                {l.earnedCertIds.has(c.id) ? 'Earned' : 'Not earned'}
-                              </button>
-                            </td>
-                          ))}
-                          <td className="py-3 w-8" />
-                        </tr>
-                      ))}
-
-                      {/* Contacts (not yet signed in) */}
-                      {pendingRegistrations.map(p => (
-                        <tr key={p.id} className="hover:bg-gray-50">
-                          <td className="py-3 pr-4">
-                            <span className="font-medium text-pendo-navy text-sm">{p.full_name ?? '—'}</span>
-                          </td>
-                          <td className="py-3 pr-4">
-                            <span className="text-sm text-gray-500">{p.email}</span>
-                          </td>
-                          <td className="py-3 pr-4">
-                            <span className="text-sm text-gray-500">{p.title ?? '—'}</span>
-                          </td>
-                          {enabledCerts.map(c => (
-                            <td key={c.id} className="py-3 pr-4">
-                              {(p.certifications ?? []).some(name => name.toLowerCase() === c.title.toLowerCase()) ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                                  </svg>
-                                  Earned
-                                </span>
+                      {filteredLearners.map(l => {
+                        const isEditing = editingRowId === l.id && editingRowType === 'learner'
+                        return (
+                          <tr key={l.id} className="hover:bg-gray-50">
+                            <td className="py-2 pr-3">
+                              {isEditing ? (
+                                <input autoFocus value={editDraft.full_name} onChange={e => setEditDraft(d => ({ ...d, full_name: e.target.value }))}
+                                  placeholder="Full name"
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-pendo-pink outline-none" />
                               ) : (
-                                <span className="text-gray-300 text-xs">—</span>
+                                <span className="font-medium text-pendo-navy text-sm">{l.full_name ?? '—'}</span>
                               )}
                             </td>
-                          ))}
-                          <td className="py-3 w-8">
-                            <button
-                              onClick={() => removePendingRegistration(p.id)}
-                              className="text-gray-300 hover:text-red-500 transition-colors"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                            <td className="py-2 pr-3">
+                              {isEditing ? (
+                                <input value={editDraft.email} onChange={e => setEditDraft(d => ({ ...d, email: e.target.value }))}
+                                  placeholder="Email"
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-pendo-pink outline-none" />
+                              ) : (
+                                <span className="text-sm text-gray-500">{l.email}</span>
+                              )}
+                            </td>
+                            <td className="py-2 pr-3">
+                              {isEditing ? (
+                                <input value={editDraft.title} onChange={e => setEditDraft(d => ({ ...d, title: e.target.value }))}
+                                  placeholder="Title"
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-pendo-pink outline-none" />
+                              ) : (
+                                <span className="text-sm text-gray-500">{l.title ?? '—'}</span>
+                              )}
+                            </td>
+                            {enabledCerts.map(c => (
+                              <td key={c.id} className="py-2 pr-3">
+                                <button
+                                  onClick={() => toggleUserCert(l, c.id)}
+                                  title={l.earnedCertIds.has(c.id) ? 'Earned — click to remove' : 'Not earned — click to mark complete'}
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-colors
+                                    ${l.earnedCertIds.has(c.id)
+                                      ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                      : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                                >
+                                  <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                  {l.earnedCertIds.has(c.id) ? 'Earned' : 'Not earned'}
+                                </button>
+                              </td>
+                            ))}
+                            <td className="py-2 w-16">
+                              {isEditing ? (
+                                <div className="flex gap-1">
+                                  <button onClick={saveEditRow} disabled={savingRow}
+                                    className="text-xs px-2 py-1 bg-pendo-pink text-white rounded font-medium disabled:opacity-50">
+                                    {savingRow ? '…' : 'Save'}
+                                  </button>
+                                  <button onClick={cancelEditRow}
+                                    className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded font-medium">
+                                    ✕
+                                  </button>
+                                </div>
+                              ) : (
+                                <button onClick={() => startEditRow(l.id, 'learner', l.full_name, l.title, l.email)}
+                                  className="text-gray-300 hover:text-pendo-pink transition-colors">
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                  </svg>
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+
+                      {/* Contacts (not yet signed in) */}
+                      {pendingRegistrations.map(p => {
+                        const isEditing = editingRowId === p.id && editingRowType === 'pending'
+                        return (
+                          <tr key={p.id} className="hover:bg-gray-50">
+                            <td className="py-2 pr-3">
+                              {isEditing ? (
+                                <input autoFocus value={editDraft.full_name} onChange={e => setEditDraft(d => ({ ...d, full_name: e.target.value }))}
+                                  placeholder="Full name"
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-pendo-pink outline-none" />
+                              ) : (
+                                <span className="font-medium text-pendo-navy text-sm">{p.full_name ?? '—'}</span>
+                              )}
+                            </td>
+                            <td className="py-2 pr-3">
+                              {isEditing ? (
+                                <input value={editDraft.email} onChange={e => setEditDraft(d => ({ ...d, email: e.target.value }))}
+                                  placeholder="Email"
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-pendo-pink outline-none" />
+                              ) : (
+                                <span className="text-sm text-gray-500">{p.email}</span>
+                              )}
+                            </td>
+                            <td className="py-2 pr-3">
+                              {isEditing ? (
+                                <input value={editDraft.title} onChange={e => setEditDraft(d => ({ ...d, title: e.target.value }))}
+                                  placeholder="Title"
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-pendo-pink outline-none" />
+                              ) : (
+                                <span className="text-sm text-gray-500">{p.title ?? '—'}</span>
+                              )}
+                            </td>
+                            {enabledCerts.map(c => (
+                              <td key={c.id} className="py-2 pr-3">
+                                {(p.certifications ?? []).some(name => name.toLowerCase() === c.title.toLowerCase()) ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Earned
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-300 text-xs">—</span>
+                                )}
+                              </td>
+                            ))}
+                            <td className="py-2 w-16">
+                              {isEditing ? (
+                                <div className="flex gap-1">
+                                  <button onClick={saveEditRow} disabled={savingRow}
+                                    className="text-xs px-2 py-1 bg-pendo-pink text-white rounded font-medium disabled:opacity-50">
+                                    {savingRow ? '…' : 'Save'}
+                                  </button>
+                                  <button onClick={cancelEditRow}
+                                    className="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded font-medium">
+                                    ✕
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1.5">
+                                  <button onClick={() => startEditRow(p.id, 'pending', p.full_name, p.title, p.email)}
+                                    className="text-gray-300 hover:text-pendo-pink transition-colors">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                    </svg>
+                                  </button>
+                                  <button onClick={() => removePendingRegistration(p.id)}
+                                    className="text-gray-300 hover:text-red-500 transition-colors">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
 
                       {filteredLearners.length === 0 && pendingRegistrations.length === 0 && (
                         <tr>
