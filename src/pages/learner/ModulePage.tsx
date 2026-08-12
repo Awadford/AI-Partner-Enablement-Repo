@@ -412,7 +412,7 @@ export function ModulePage() {
                   {docs.map((doc, i) => (
                     <li key={i}>
                       <button
-                        onClick={() => isEmbeddable(doc.url) ? setModalLink({ url: doc.url, title: doc.title }) : window.open(doc.url, '_blank')}
+                        onClick={() => isEmbeddable(doc.url) ? setModalLink({ url: doc.url, title: doc.title }) : doc.url.startsWith('claude://') ? (window.location.href = doc.url) : window.open(doc.url, '_blank')}
                         className="flex items-center gap-2 text-sm text-pendo-pink hover:text-pendo-pink-dark hover:underline transition-colors text-left"
                       >
                         <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

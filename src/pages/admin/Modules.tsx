@@ -13,6 +13,8 @@ interface IframeOverrides {
 }
 
 interface EditState {
+  synopsis: string
+  why_it_matters: string
   video_url: string
   video_url_extension: string
   docs: DocItem[]
@@ -37,6 +39,7 @@ export function AdminModules() {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
   const [editState, setEditState] = useState<EditState>({
+    synopsis: '', why_it_matters: '',
     video_url: '', video_url_extension: '', docs: [], recordings: [],
     exec_url: '', exec_prompt: '', iframe_url: '',
     iframe_overrides: { video: false, resources: false, recordings: false, exec: false },
@@ -61,6 +64,8 @@ export function AdminModules() {
     const m = (fresh as LmsModule) ?? mod
     setEditing(m.id)
     setEditState({
+      synopsis: m.content?.synopsis ?? '',
+      why_it_matters: m.content?.why_it_matters ?? '',
       video_url: m.content?.video_url ?? '',
       video_url_extension: m.content?.video_url_extension ?? '',
       docs: m.content?.docs?.map((d: DocItem) => ({ ...d })) ?? [],
@@ -82,6 +87,8 @@ export function AdminModules() {
     setSaving(true)
     const updatedContent = {
       ...mod.content,
+      synopsis: editState.synopsis || undefined,
+      why_it_matters: editState.why_it_matters || undefined,
       video_url: editState.video_url || null,
       video_url_extension: editState.video_url_extension || null,
       docs: editState.docs.filter(d => d.title || d.url),
@@ -225,6 +232,29 @@ export function AdminModules() {
 
                                 {editing === mod.id ? (
                                   <div className="space-y-5">
+                                    {/* Synopsis & Why It Matters */}
+                                    <div>
+                                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Overview</p>
+                                      <div className="space-y-2">
+                                        <div>
+                                          <label className="block text-xs text-gray-500 mb-1">Synopsis</label>
+                                          <textarea value={editState.synopsis}
+                                            onChange={e => setEditState(s => ({ ...s, synopsis: e.target.value }))}
+                                            rows={3}
+                                            placeholder="Brief description of what this module covers…"
+                                            className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-pendo-pink resize-none" />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs text-gray-500 mb-1">Why It Matters / Key Outcomes</label>
+                                          <textarea value={editState.why_it_matters}
+                                            onChange={e => setEditState(s => ({ ...s, why_it_matters: e.target.value }))}
+                                            rows={3}
+                                            placeholder="Business outcomes, customer examples, key buyer personas…"
+                                            className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-pendo-pink resize-none" />
+                                        </div>
+                                      </div>
+                                    </div>
+
                                     {/* Overview Video */}
                                     <div>
                                       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Overview Video</p>
