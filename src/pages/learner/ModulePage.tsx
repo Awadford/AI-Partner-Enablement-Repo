@@ -134,6 +134,7 @@ export function ModulePage() {
   const [loading, setLoading] = useState(true)
   const [completing, setCompleting] = useState(false)
   const [docsOpen, setDocsOpen] = useState(true)
+  const [expandedHtmlDoc, setExpandedHtmlDoc] = useState<number | null>(null)
   const [markedComplete, setMarkedComplete] = useState(false)
   const [modalLink, setModalLink] = useState<{ url: string; title: string } | null>(null)
   const [execAttempted, setExecAttempted] = useState(false)
@@ -411,15 +412,40 @@ export function ModulePage() {
                 <ul className="space-y-2">
                   {docs.map((doc, i) => (
                     <li key={i}>
-                      <button
-                        onClick={() => isEmbeddable(doc.url) ? setModalLink({ url: doc.url, title: doc.title }) : doc.url.startsWith('claude://') ? (window.location.href = doc.url) : window.open(doc.url, '_blank')}
-                        className="flex items-center gap-2 text-sm text-pendo-pink hover:text-pendo-pink-dark hover:underline transition-colors text-left"
-                      >
-                        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                        </svg>
-                        {doc.title}
-                      </button>
+                      {doc.html ? (
+                        <div>
+                          <button
+                            onClick={() => setExpandedHtmlDoc(expandedHtmlDoc === i ? null : i)}
+                            className="flex items-center gap-2 text-sm text-pendo-pink hover:text-pendo-pink-dark hover:underline transition-colors text-left"
+                          >
+                            <svg className={`w-4 h-4 flex-shrink-0 transition-transform ${expandedHtmlDoc === i ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                            {doc.title}
+                          </button>
+                          {expandedHtmlDoc === i && (
+                            <div className="mt-3 rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                              <iframe
+                                srcDoc={doc.html}
+                                title={doc.title}
+                                className="w-full"
+                                style={{ height: '600px', border: 'none' }}
+                                sandbox="allow-scripts allow-same-origin"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => isEmbeddable(doc.url) ? setModalLink({ url: doc.url, title: doc.title }) : window.open(doc.url, '_blank')}
+                          className="flex items-center gap-2 text-sm text-pendo-pink hover:text-pendo-pink-dark hover:underline transition-colors text-left"
+                        >
+                          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                          {doc.title}
+                        </button>
+                      )}
                     </li>
                   ))}
                 </ul>

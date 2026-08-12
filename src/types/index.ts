@@ -18,6 +18,7 @@ export interface LmsPartnerDomain {
 export interface ModuleDoc {
   title: string
   url: string
+  html?: string  // inline HTML content — rendered via srcdoc iframe instead of external link
 }
 
 export interface ModuleRecording {
