@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { Layout } from '../../components/Layout'
 import { Partner } from '../../types'
 
-const PARTNER_TYPES = ['Solution Partner', 'OEM', 'Referral', 'Reseller', 'ISV', 'PE Firm', 'Japan Partner']
+const PARTNER_TYPES = ['Solution Partner', 'OEM', 'Referral', 'Reseller', 'Services', 'Subcontractor', 'ISV', 'PE Firm', 'Japan Partner']
 
 interface NewPartnerForm {
   name: string

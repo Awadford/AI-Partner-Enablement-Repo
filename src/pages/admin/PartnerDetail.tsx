@@ -29,7 +29,13 @@ interface PendingRegistration {
   created_at: string
 }
 
-const PARTNER_TYPES = ['Solution Partner', 'OEM', 'Referral', 'Reseller', 'ISV', 'PE Firm', 'Japan Partner']
+const PARTNER_TYPES = ['Solution Partner', 'OEM', 'Referral', 'Reseller', 'Services', 'Subcontractor', 'ISV', 'PE Firm', 'Japan Partner']
+
+// Parse category_type string — handles both ", " and " + " separators (legacy data)
+function parseTypes(raw: string | null | undefined): string[] {
+  if (!raw) return []
+  return raw.split(/,\s*|\s*\+\s*/).map(t => t.trim()).filter(Boolean)
+}
 
 export function AdminPartnerDetail() {
   const { partnerId } = useParams<{ partnerId: string }>()
@@ -533,14 +539,14 @@ export function AdminPartnerDetail() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Partner Type</label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {PARTNER_TYPES.map(type => {
-                    const selected = (editPartner.category_type ?? '').split(', ').filter(Boolean).includes(type)
+                    const selected = parseTypes(editPartner.category_type).includes(type)
                     return (
                       <label key={type} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={selected}
                           onChange={e => {
-                            const current = (editPartner.category_type ?? '').split(', ').filter(Boolean)
+                            const current = parseTypes(editPartner.category_type)
                             const next = e.target.checked
                               ? [...current, type]
                               : current.filter(t => t !== type)
