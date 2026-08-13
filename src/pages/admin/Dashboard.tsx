@@ -32,11 +32,12 @@ export function AdminDashboard() {
 
   useEffect(() => {
     async function load() {
-      const [partnersRes, learnersRes, modulesRes, certsRes] = await Promise.all([
+      const [partnersRes, learnersRes, modulesRes, certsRes, pendingCertsRes] = await Promise.all([
         supabase.from('partners').select('*').order('name'),
         supabase.from('lms_profiles').select('*, partners(name)').eq('is_admin', false).eq('is_pdm', false),
         supabase.from('lms_modules').select('id'),
         supabase.from('lms_user_certifications').select('id'),
+        supabase.from('lms_pending_registrations').select('certifications'),
       ])
 
       const partnerList = (partnersRes.data ?? []) as Partner[]
@@ -53,7 +54,9 @@ export function AdminDashboard() {
         activePartners: partnerList.filter(p => p.enbl_stage === 'active').length,
         totalLearners: learnerList.length,
         totalModules: modulesRes.data?.length ?? 0,
-        totalCertifications: certsRes.data?.length ?? 0,
+        totalCertifications: (certsRes.data?.length ?? 0) +
+          ((pendingCertsRes.data ?? []) as { certifications: string[] }[])
+            .reduce((sum, r) => sum + (r.certifications?.length ?? 0), 0),
       })
       setLoading(false)
     }
