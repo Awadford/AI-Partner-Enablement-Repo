@@ -115,6 +115,7 @@ export interface LmsProfile {
   title: string | null
   partner_id: string | null
   is_admin: boolean
+  is_pdm: boolean
   created_at: string
   updated_at: string
 }

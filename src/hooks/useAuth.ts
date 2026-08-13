@@ -31,8 +31,18 @@ export function useAuth(): AuthState {
 
     // Profile doesn't exist — create one
     const email = u.email ?? ''
-    const ADMIN_EMAILS = ['andrew.wadford@pendo.io', 'gabrielle.vacca@pendo.io', 'adam.goings@pendo.io']
-    const isAdmin = ADMIN_EMAILS.includes(email)
+
+    // Check lms_user_invites for pre-provisioned roles
+    const { data: invite } = await supabase
+      .from('lms_user_invites')
+      .select('is_admin, is_pdm')
+      .eq('email', email)
+      .single()
+
+    // Fallback hardcoded admins for bootstrapping
+    const ADMIN_EMAILS = ['andrew.wadford@pendo.io', 'gabrielle.vacca@pendo.io', 'adam.goings@pendo.io', 'bgreenberg@pendo.io']
+    const isAdmin = invite?.is_admin ?? ADMIN_EMAILS.includes(email)
+    const isPdm = invite?.is_pdm ?? false
 
     // Find partner by email domain or pending registration
     let partnerId: string | null = null
@@ -70,6 +80,7 @@ export function useAuth(): AuthState {
       title: null,
       partner_id: partnerId,
       is_admin: isAdmin,
+      is_pdm: isPdm,
     }
 
     const { data: created, error: createError } = await supabase
@@ -136,6 +147,11 @@ export function useAuth(): AuthState {
 
       // 3. Remove the pending registration
       await supabase.from('lms_pending_registrations').delete().eq('id', pendingRecord.id)
+    }
+
+    // Clean up invite record now that it's been applied
+    if (invite) {
+      await supabase.from('lms_user_invites').delete().eq('email', email)
     }
 
     return created as LmsProfile

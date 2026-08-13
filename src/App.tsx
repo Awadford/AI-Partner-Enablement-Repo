@@ -6,6 +6,7 @@ import { AdminDashboard } from './pages/admin/Dashboard'
 import { AdminPartners } from './pages/admin/Partners'
 import { AdminPartnerDetail } from './pages/admin/PartnerDetail'
 import { AdminModules } from './pages/admin/Modules'
+import { AdminUsers } from './pages/admin/Users'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { AdminRoute } from './components/AdminRoute'
 
@@ -35,6 +36,9 @@ function App() {
         } />
         <Route path="/admin/modules" element={
           <AdminRoute><AdminModules /></AdminRoute>
+        } />
+        <Route path="/admin/users" element={
+          <AdminRoute><AdminUsers /></AdminRoute>
         } />
 
         {/* Default redirect */}

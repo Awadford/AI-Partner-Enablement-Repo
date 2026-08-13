@@ -60,6 +60,13 @@ export function Layout({ children }: LayoutProps) {
                   >
                     Modules
                   </Link>
+                  <Link
+                    to="/admin/users"
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
+                      ${location.pathname === '/admin/users' ? 'bg-white bg-opacity-20 text-white' : 'text-gray-300 hover:text-white hover:bg-white hover:bg-opacity-10'}`}
+                  >
+                    Users
+                  </Link>
                 </div>
               )}
             </div>
