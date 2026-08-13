@@ -6,6 +6,8 @@ export interface Partner {
   pdm: string | null
   region: string | null
   notes: string | null
+  salesforce_account_id: string | null
+  salesforce_account_name: string | null
 }
 
 export interface LmsPartnerDomain {

@@ -37,6 +37,11 @@ export function AdminPartnerDetail() {
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
 
+  // Salesforce account search
+  const [sfQuery, setSfQuery] = useState('')
+  const [sfResults, setSfResults] = useState<{ sf_id: string; name: string; website: string | null }[]>([])
+  const [sfSearchOpen, setSfSearchOpen] = useState(false)
+
   const [domains, setDomains] = useState<LmsPartnerDomain[]>([])
   const [newDomain, setNewDomain] = useState('')
   const [addingDomain, setAddingDomain] = useState(false)
@@ -83,7 +88,7 @@ export function AdminPartnerDetail() {
 
     const p = partnerRes.data as Partner
     setPartner(p)
-    setEditPartner({ name: p.name, notes: p.notes ?? '', enbl_stage: p.enbl_stage, pdm: p.pdm ?? '', region: p.region ?? '' })
+    setEditPartner({ name: p.name, notes: p.notes ?? '', enbl_stage: p.enbl_stage, pdm: p.pdm ?? '', region: p.region ?? '', salesforce_account_id: p.salesforce_account_id ?? '', salesforce_account_name: p.salesforce_account_name ?? '' })
     setDomains((domainsRes.data ?? []) as LmsPartnerDomain[])
 
     const pmMap: Record<string, LmsPartnerModule> = {}
@@ -149,6 +154,8 @@ export function AdminPartnerDetail() {
       enbl_stage: editPartner.enbl_stage,
       pdm: editPartner.pdm || null,
       region: editPartner.region || null,
+      salesforce_account_id: editPartner.salesforce_account_id || null,
+      salesforce_account_name: editPartner.salesforce_account_name || null,
     }).eq('id', partnerId)
     setSaving(false)
     if (!error) {
@@ -156,6 +163,25 @@ export function AdminPartnerDetail() {
       setPartner(prev => prev ? { ...prev, ...editPartner } as Partner : null)
       setTimeout(() => setSaveMsg(''), 2000)
     }
+  }
+
+  const searchSfAccounts = async (q: string) => {
+    setSfQuery(q)
+    if (q.trim().length < 2) { setSfResults([]); return }
+    const { data } = await supabase
+      .from('sf_accounts_cache')
+      .select('sf_id, name, website')
+      .ilike('name', `%${q}%`)
+      .order('name')
+      .limit(8)
+    setSfResults((data ?? []) as { sf_id: string; name: string; website: string | null }[])
+  }
+
+  const selectSfAccount = (acc: { sf_id: string; name: string }) => {
+    setEditPartner(prev => ({ ...prev, salesforce_account_id: acc.sf_id, salesforce_account_name: acc.name }))
+    setSfQuery('')
+    setSfResults([])
+    setSfSearchOpen(false)
   }
 
   const addDomain = async () => {
@@ -496,6 +522,76 @@ export function AdminPartnerDetail() {
                   rows={3}
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-pendo-pink focus:border-transparent outline-none resize-none"
                 />
+              </div>
+
+              {/* Salesforce Account */}
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Salesforce Account</label>
+                {editPartner.salesforce_account_id ? (
+                  <div className="flex items-center gap-3">
+                    <a
+                      href={`https://pendo.lightning.force.com/lightning/r/Account/${editPartner.salesforce_account_id}/view`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 hover:bg-blue-100 transition-colors font-medium"
+                    >
+                      <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/>
+                      </svg>
+                      {editPartner.salesforce_account_name || editPartner.salesforce_account_id}
+                      <svg className="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </a>
+                    <button
+                      onClick={() => { setEditPartner(prev => ({ ...prev, salesforce_account_id: '', salesforce_account_name: '' })); setSfSearchOpen(true) }}
+                      className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                    >
+                      Change
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setSfSearchOpen(o => !o)}
+                    className="flex items-center gap-2 px-3 py-2 border border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    Search Salesforce account…
+                  </button>
+                )}
+                {sfSearchOpen && (
+                  <div className="mt-2 relative">
+                    <input
+                      autoFocus
+                      type="text"
+                      value={sfQuery}
+                      onChange={e => searchSfAccounts(e.target.value)}
+                      placeholder="Type account name…"
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none"
+                    />
+                    {sfResults.length > 0 && (
+                      <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                        {sfResults.map(r => (
+                          <button
+                            key={r.sf_id}
+                            onClick={() => selectSfAccount(r)}
+                            className="w-full flex items-start gap-3 px-4 py-2.5 hover:bg-blue-50 transition-colors text-left"
+                          >
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">{r.name}</div>
+                              {r.website && <div className="text-xs text-gray-400">{r.website}</div>}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {sfQuery.length >= 2 && sfResults.length === 0 && (
+                      <p className="mt-1 text-xs text-gray-400">No accounts found — try a different name</p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-3 mt-4">
