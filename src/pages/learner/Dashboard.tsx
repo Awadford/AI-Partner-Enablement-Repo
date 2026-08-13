@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { Layout } from '../../components/Layout'
 import { ModuleCard } from '../../components/ModuleCard'
 import { ProgressBar } from '../../components/ProgressBar'
-import { Partner, LmsModule, LmsPartnerModule, ModuleWithProgress, LmsCertification } from '../../types'
+import { Partner, LmsModule, LmsPartnerModule, ModuleWithProgress, LmsCertification, LmsUserCertification } from '../../types'
 import { LinkModal } from '../../components/LinkModal'
 
 export function LearnerDashboard() {
@@ -15,6 +15,7 @@ export function LearnerDashboard() {
   const [partner, setPartner] = useState<Partner | null>(null)
   const [modules, setModules] = useState<ModuleWithProgress[]>([])
   const [certifications, setCertifications] = useState<LmsCertification[]>([])
+  const [earnedCertIds, setEarnedCertIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [modalLink, setModalLink] = useState<{ url: string; title: string } | null>(null)
 
@@ -26,15 +27,15 @@ export function LearnerDashboard() {
       }
 
       if (profile.is_admin) {
-        // Admins see all modules, all unlocked, ordered by category + default_order
-        const { data: allModules } = await supabase
-          .from('lms_modules')
-          .select('*')
-          .order('category', { ascending: true })
-          .order('default_order', { ascending: true })
+        // Admins see all modules + all certifications
+        const [allModulesRes, allCertsRes, earnedRes] = await Promise.all([
+          supabase.from('lms_modules').select('*').order('category', { ascending: true }).order('default_order', { ascending: true }),
+          supabase.from('lms_certifications').select('*').order('order_index', { ascending: true }),
+          supabase.from('lms_user_certifications').select('certification_id').eq('user_id', profile.id),
+        ])
 
-        if (allModules) {
-          const withProgress: ModuleWithProgress[] = (allModules as LmsModule[]).map((mod, idx) => ({
+        if (allModulesRes.data) {
+          const withProgress: ModuleWithProgress[] = (allModulesRes.data as LmsModule[]).map((mod, idx) => ({
             ...mod,
             order_index: idx,
             enabled: true,
@@ -43,6 +44,8 @@ export function LearnerDashboard() {
           }))
           setModules(withProgress)
         }
+        if (allCertsRes.data) setCertifications(allCertsRes.data as LmsCertification[])
+        if (earnedRes.data) setEarnedCertIds(new Set((earnedRes.data as LmsUserCertification[]).map(r => r.certification_id)))
         setLoading(false)
         return
       }
@@ -60,21 +63,20 @@ export function LearnerDashboard() {
         .single()
       setPartner(partnerData as Partner)
 
-      // Load enabled certifications for this partner
-      const { data: certRows } = await supabase
-        .from('lms_partner_certifications')
-        .select('*, lms_certifications(*)')
-        .eq('partner_id', profile.partner_id)
-        .eq('enabled', true)
-        .order('lms_certifications(order_index)', { ascending: true })
+      // Load enabled certifications for this partner + which ones the user has earned
+      const [certRows, earnedRes] = await Promise.all([
+        supabase.from('lms_partner_certifications').select('*, lms_certifications(*)').eq('partner_id', profile.partner_id).eq('enabled', true).order('lms_certifications(order_index)', { ascending: true }),
+        supabase.from('lms_user_certifications').select('certification_id').eq('user_id', profile.id),
+      ])
 
-      if (certRows) {
+      if (certRows.data) {
         setCertifications(
-          certRows
+          certRows.data
             .filter((r: any) => r.lms_certifications)
             .map((r: any) => r.lms_certifications as LmsCertification)
         )
       }
+      if (earnedRes.data) setEarnedCertIds(new Set((earnedRes.data as LmsUserCertification[]).map(r => r.certification_id)))
 
       // Load enabled modules for this partner
       const { data: pmRows } = await supabase
@@ -159,28 +161,36 @@ export function LearnerDashboard() {
               at checkout for 100% off.
             </p>
             <div className="space-y-3">
-              {certifications.map((cert, idx) => (
-                <button
-                  key={cert.id}
-                  onClick={() => setModalLink({ url: cert.url, title: cert.title })}
-                  className="w-full flex items-start gap-4 bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:border-pendo-pink hover:shadow-md transition-all group text-left"
-                >
-                  <div className="w-8 h-8 rounded-full bg-pendo-navy bg-opacity-10 flex items-center justify-center text-pendo-navy text-sm font-semibold flex-shrink-0 mt-0.5">
-                    {idx + 1}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-pendo-navy group-hover:text-pendo-pink transition-colors">{cert.title}</h3>
-                      <svg className="w-3.5 h-3.5 text-gray-400 group-hover:text-pendo-pink transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                      </svg>
+              {certifications.map((cert, idx) => {
+                const earned = earnedCertIds.has(cert.id)
+                return (
+                  <button
+                    key={cert.id}
+                    onClick={() => setModalLink({ url: cert.url, title: cert.title })}
+                    className={`w-full flex items-start gap-4 bg-white rounded-xl border p-4 shadow-sm hover:shadow-md transition-all group text-left
+                      ${earned ? 'border-green-200 bg-green-50' : 'border-gray-200 hover:border-pendo-pink'}`}
+                  >
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 mt-0.5
+                      ${earned ? 'bg-green-100 text-green-700' : 'bg-pendo-navy bg-opacity-10 text-pendo-navy'}`}>
+                      {earned
+                        ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                        : idx + 1}
                     </div>
-                    {cert.description && (
-                      <p className="text-sm text-gray-500 mt-0.5">{cert.description}</p>
-                    )}
-                  </div>
-                </button>
-              ))}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className={`font-semibold transition-colors ${earned ? 'text-green-700' : 'text-pendo-navy group-hover:text-pendo-pink'}`}>{cert.title}</h3>
+                        {earned && <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-0.5 rounded-full">Earned</span>}
+                        <svg className="w-3.5 h-3.5 text-gray-400 group-hover:text-pendo-pink transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </div>
+                      {cert.description && (
+                        <p className="text-sm text-gray-500 mt-0.5">{cert.description}</p>
+                      )}
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           </div>
         )}
