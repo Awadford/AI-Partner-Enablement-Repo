@@ -511,6 +511,7 @@ export function AdminPartnerDetail() {
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-pendo-pink focus:border-transparent outline-none bg-white"
                 >
                   <option value="">— Unassigned —</option>
+                  <option value="Craig Hyatt">Craig Hyatt</option>
                   <option value="Eugene Darmanto">Eugene Darmanto</option>
                   <option value="Gautham Pandiyan">Gautham Pandiyan</option>
                   <option value="Lindsey Paluso">Lindsey Paluso</option>
