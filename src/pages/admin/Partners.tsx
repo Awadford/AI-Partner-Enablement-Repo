@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { Layout } from '../../components/Layout'
 import { Partner } from '../../types'
@@ -14,10 +14,11 @@ interface NewPartnerForm {
 }
 
 export function AdminPartners() {
+  const [searchParams] = useSearchParams()
   const [partners, setPartners] = useState<Partner[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [stageFilter, setStageFilter] = useState<string>('all')
+  const [stageFilter, setStageFilter] = useState<string>(searchParams.get('stage') ?? 'all')
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [pdmFilter, setPdmFilter] = useState<string>('all')
   const [regionFilter, setRegionFilter] = useState<string>('all')
