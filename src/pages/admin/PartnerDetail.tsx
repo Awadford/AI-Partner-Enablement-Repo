@@ -29,6 +29,8 @@ interface PendingRegistration {
   created_at: string
 }
 
+const PARTNER_TYPES = ['Solution Partner', 'OEM', 'Referral', 'Reseller', 'ISV', 'PE Firm', 'Japan Partner']
+
 export function AdminPartnerDetail() {
   const { partnerId } = useParams<{ partnerId: string }>()
 
@@ -88,7 +90,7 @@ export function AdminPartnerDetail() {
 
     const p = partnerRes.data as Partner
     setPartner(p)
-    setEditPartner({ name: p.name, notes: p.notes ?? '', enbl_stage: p.enbl_stage, pdm: p.pdm ?? '', region: p.region ?? '', salesforce_account_id: p.salesforce_account_id ?? '', salesforce_account_name: p.salesforce_account_name ?? '' })
+    setEditPartner({ name: p.name, notes: p.notes ?? '', enbl_stage: p.enbl_stage, pdm: p.pdm ?? '', region: p.region ?? '', category_type: p.category_type ?? '', salesforce_account_id: p.salesforce_account_id ?? '', salesforce_account_name: p.salesforce_account_name ?? '' })
     setDomains((domainsRes.data ?? []) as LmsPartnerDomain[])
 
     const pmMap: Record<string, LmsPartnerModule> = {}
@@ -154,6 +156,7 @@ export function AdminPartnerDetail() {
       enbl_stage: editPartner.enbl_stage,
       pdm: editPartner.pdm || null,
       region: editPartner.region || null,
+      category_type: editPartner.category_type || null,
       salesforce_account_id: editPartner.salesforce_account_id || null,
       salesforce_account_name: editPartner.salesforce_account_name || null,
     }).eq('id', partnerId)
@@ -525,6 +528,31 @@ export function AdminPartnerDetail() {
                   <option value="APAC">APAC</option>
                   <option value="JAPAN">JAPAN</option>
                 </select>
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Partner Type</label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {PARTNER_TYPES.map(type => {
+                    const selected = (editPartner.category_type ?? '').split(', ').filter(Boolean).includes(type)
+                    return (
+                      <label key={type} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={e => {
+                            const current = (editPartner.category_type ?? '').split(', ').filter(Boolean)
+                            const next = e.target.checked
+                              ? [...current, type]
+                              : current.filter(t => t !== type)
+                            setEditPartner(prev => ({ ...prev, category_type: next.join(', ') || null as any }))
+                          }}
+                          className="rounded border-gray-300 text-pendo-pink focus:ring-pendo-pink"
+                        />
+                        {type}
+                      </label>
+                    )
+                  })}
+                </div>
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
