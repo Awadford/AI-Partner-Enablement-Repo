@@ -15,6 +15,8 @@
  *   PARTNER_ONBOARD_SECRET    – shared token sent by SF Flow in X-Onboard-Secret header
  *   SLACK_BOT_TOKEN            – Slack bot OAuth token (xoxb-...) with scopes:
  *                                channels:manage, chat:write, chat:write.public
+ *   SLACK_PEM_GROUP_ID         – (optional) Slack user group ID for @pem (e.g. S012AB3CD)
+ *                                Found in: Slack Admin → Manage User Groups → pem → URL
  *   SUPABASE_URL               – auto-injected
  *   SUPABASE_SERVICE_ROLE_KEY  – auto-injected (for DB writes bypassing RLS)
  *
@@ -186,6 +188,59 @@ async function postSlackMessage(
   if (!data.ok) console.error("Slack postMessage failed:", data.error);
 }
 
+/**
+ * Posts a Docebo onboarding request to #solution-partner-technical-enablement-pirate-team
+ * matching the existing PEM workflow message format.
+ */
+async function postDoceboNotification(
+  botToken: string,
+  payload: OnboardPayload,
+  pemGroupId: string | null
+): Promise<void> {
+  const PEM_CHANNEL_ID = "C0A26R5GDLL"; // #solution-partner-technical-enablement-pirate-team
+
+  const pemMention = pemGroupId ? `<!subteam^${pemGroupId}|@pem>` : `<!subteam^S02SQ819A91|@pem>`;
+  const enablementContent = [payload.partnerType, payload.partnerSubType]
+    .filter(Boolean)
+    .join(", ") || "Partner";
+
+  const body = {
+    channel: PEM_CHANNEL_ID,
+    blocks: [
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `Good news - another partner is ready for Enablement. ${pemMention} team to add email domain to Docebo content. <@UJ9AYR4QY> <@U08M48C4B6J> Please mark this message with a ✅ once complete.`,
+        },
+      },
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: [
+            `*Name of Partner Organisation*\n${payload.accountName}`,
+            `*User Name*\n${payload.partnerContactName ?? "Not provided"}`,
+            `*Email*\n${payload.partnerContactEmail ?? "Not provided"}`,
+            `*Enablement Content*\n${enablementContent}`,
+          ].join("\n\n"),
+        },
+      },
+    ],
+  };
+
+  const res = await fetch("https://slack.com/api/chat.postMessage", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${botToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!data.ok) console.error("Docebo Slack notification failed:", data.error);
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
@@ -207,6 +262,7 @@ Deno.serve(async (req: Request) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const slackBotToken = Deno.env.get("SLACK_BOT_TOKEN")!;
+  const pemGroupId = Deno.env.get("SLACK_PEM_GROUP_ID") ?? null;
 
   const supabase = createClient(supabaseUrl, serviceKey);
 
@@ -254,9 +310,10 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  // ── 4. Create Slack channel + post notification ───────────────────────────
+  // ── 4. Create Slack channel + post notifications ─────────────────────────
   if (slackBotToken) {
     try {
+      // 4a. Create partner channel and post onboarding message
       const slug = toChannelSlug(payload.accountName);
       const channelName = `external-${slug}-partnership-core-team`;
       const channelId = await createSlackChannel(slackBotToken, channelName);
@@ -264,7 +321,14 @@ Deno.serve(async (req: Request) => {
         await postSlackMessage(slackBotToken, channelId, payload, partnerId);
       }
     } catch (e) {
-      console.error("Slack setup failed:", e);
+      console.error("Slack channel setup failed:", e);
+    }
+
+    try {
+      // 4b. Notify PEM team in #solution-partner-technical-enablement-pirate-team
+      await postDoceboNotification(slackBotToken, payload, pemGroupId);
+    } catch (e) {
+      console.error("Docebo notification failed:", e);
     }
   }
 
