@@ -107,9 +107,9 @@ export function AdminPartners() {
                     onChange={e => setForm(f => ({ ...f, enbl_stage: e.target.value as 'pre' | 'active' | 'post' }))}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pendo-pink"
                   >
-                    <option value="pre">Pre</option>
+                    <option value="pre">Pre Agreement</option>
                     <option value="active">Active</option>
-                    <option value="post">Post</option>
+                    <option value="post">Inactive</option>
                   </select>
                 </div>
                 <div>
@@ -179,9 +179,9 @@ export function AdminPartners() {
             className="px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-pendo-pink focus:border-transparent outline-none"
           >
             <option value="all">All Stages</option>
-            <option value="pre">Pre</option>
+            <option value="pre">Pre Agreement</option>
             <option value="active">Active</option>
-            <option value="post">Post</option>
+            <option value="post">Inactive</option>
           </select>
           <select
             value={typeFilter}
@@ -253,7 +253,7 @@ export function AdminPartners() {
                         ${p.enbl_stage === 'active' ? 'bg-green-100 text-green-700' :
                           p.enbl_stage === 'pre' ? 'bg-yellow-100 text-yellow-700' :
                           'bg-gray-100 text-gray-600'}`}>
-                        {p.enbl_stage}
+                        {p.enbl_stage === 'pre' ? 'Pre Agreement' : p.enbl_stage === 'post' ? 'Inactive' : 'Active'}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">{p.category_type ?? '—'}</td>

@@ -498,9 +498,9 @@ export function AdminPartnerDetail() {
                   onChange={e => setEditPartner(prev => ({ ...prev, enbl_stage: e.target.value as 'pre' | 'active' | 'post' }))}
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-pendo-pink focus:border-transparent outline-none"
                 >
-                  <option value="pre">Pre</option>
+                  <option value="pre">Pre Agreement</option>
                   <option value="active">Active</option>
-                  <option value="post">Post</option>
+                  <option value="post">Inactive</option>
                 </select>
               </div>
               <div>
