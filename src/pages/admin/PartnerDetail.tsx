@@ -29,7 +29,7 @@ interface PendingRegistration {
   created_at: string
 }
 
-const PARTNER_TYPES = ['Solution Partner', 'OEM', 'Referral', 'Reseller', 'Services', 'Subcontractor', 'ISV', 'PE Firm', 'Japan Partner']
+const PARTNER_TYPES = ['Solution Partner', 'OEM', 'Referral', 'Reseller', 'Services', 'Subcontractor', 'HyperScaler', 'ISV', 'PE Firm', 'Japan Partner']
 
 // Parse category_type string — handles both ", " and " + " separators (legacy data)
 function parseTypes(raw: string | null | undefined): string[] {
