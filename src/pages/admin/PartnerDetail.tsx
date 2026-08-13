@@ -496,23 +496,35 @@ export function AdminPartnerDetail() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">PDM Contact</label>
-                <input
-                  type="text"
+                <select
                   value={editPartner.pdm ?? ''}
                   onChange={e => setEditPartner(prev => ({ ...prev, pdm: e.target.value }))}
-                  placeholder="e.g. Jane Smith"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-pendo-pink focus:border-transparent outline-none"
-                />
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-pendo-pink focus:border-transparent outline-none bg-white"
+                >
+                  <option value="">— Unassigned —</option>
+                  <option value="Eugene Darmanto">Eugene Darmanto</option>
+                  <option value="Gautham Pandiyan">Gautham Pandiyan</option>
+                  <option value="Lindsey Paluso">Lindsey Paluso</option>
+                  <option value="Madyson Malek">Madyson Malek</option>
+                  <option value="Ricardo Villarreal">Ricardo Villarreal</option>
+                  <option value="Riley Huber">Riley Huber</option>
+                  <option value="Tomoo Taniguchi">Tomoo Taniguchi</option>
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Region</label>
-                <input
-                  type="text"
+                <select
                   value={editPartner.region ?? ''}
                   onChange={e => setEditPartner(prev => ({ ...prev, region: e.target.value }))}
-                  placeholder="e.g. North America"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-pendo-pink focus:border-transparent outline-none"
-                />
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-pendo-pink focus:border-transparent outline-none bg-white"
+                >
+                  <option value="">— Unassigned —</option>
+                  <option value="North America">North America</option>
+                  <option value="EMEA">EMEA</option>
+                  <option value="LATAM">LATAM</option>
+                  <option value="APAC">APAC</option>
+                  <option value="JAPAN">JAPAN</option>
+                </select>
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
