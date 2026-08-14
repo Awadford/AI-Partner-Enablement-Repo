@@ -51,7 +51,7 @@ export function Layout({ children }: LayoutProps) {
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
                       ${location.pathname.startsWith('/admin/partners') ? 'bg-white bg-opacity-20 text-white' : 'text-gray-300 hover:text-white hover:bg-white hover:bg-opacity-10'}`}
                   >
-                    Partners
+                    Partners / Internal Teams
                   </Link>
                   <Link
                     to="/admin/modules"
