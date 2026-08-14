@@ -33,11 +33,24 @@ const CATEGORIES: { key: 'delivery' | 'product' | 'services' | 'gtm'; label: str
   { key: 'gtm',      label: 'GTM',       dot: 'bg-green-500' },
 ]
 
+interface NewModuleForm {
+  title: string
+  description: string
+  category: 'delivery' | 'product' | 'services' | 'gtm'
+}
+
+function slugify(title: string): string {
+  return title.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-')
+}
+
 export function AdminModules() {
   const [modules, setModules] = useState<LmsModule[]>([])
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
+  const [showAddModule, setShowAddModule] = useState(false)
+  const [newModule, setNewModule] = useState<NewModuleForm>({ title: '', description: '', category: 'delivery' })
+  const [addingSaving, setAddingSaving] = useState(false)
   const [editState, setEditState] = useState<EditState>({
     synopsis: '', why_it_matters: '',
     video_url: '', video_url_extension: '', docs: [], recordings: [],
@@ -58,6 +71,32 @@ export function AdminModules() {
   }
 
   useEffect(() => { loadModules() }, [])
+
+  async function addModule(e: React.FormEvent) {
+    e.preventDefault()
+    setAddingSaving(true)
+    const catModules = modules.filter(m => m.category === newModule.category)
+    const maxOrder = catModules.reduce((max, m) => Math.max(max, m.default_order), 0)
+    const slug = slugify(newModule.title) || `module-${Date.now()}`
+    const { data, error } = await supabase.from('lms_modules').insert([{
+      title: newModule.title,
+      description: newModule.description,
+      category: newModule.category,
+      slug,
+      default_order: maxOrder + 1,
+      content: {},
+    }]).select().single()
+    if (!error && data) {
+      setModules(prev => [...prev, data as LmsModule])
+      setShowAddModule(false)
+      setNewModule({ title: '', description: '', category: 'delivery' })
+      // Auto-expand the new module's category and the module itself
+      setExpandedCategories(prev => new Set([...prev, newModule.category]))
+      setExpanded((data as LmsModule).id)
+      startEdit(data as LmsModule)
+    }
+    setAddingSaving(false)
+  }
 
   async function startEdit(mod: LmsModule) {
     const { data: fresh } = await supabase.from('lms_modules').select('*').eq('id', mod.id).single()
@@ -130,17 +169,91 @@ export function AdminModules() {
   return (
     <Layout>
       <div className="max-w-5xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <div className="mb-6 flex items-start justify-between">
+        <div className="mb-6 flex items-start justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-pendo-navy">Module Catalog</h1>
             <p className="text-gray-500 mt-1">{modules.length} modules across 4 categories</p>
           </div>
-          {saveMsg && (
-            <span className={`text-sm font-medium px-3 py-1 rounded-full ${saveMsg === 'Saved!' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-              {saveMsg}
-            </span>
-          )}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            {saveMsg && (
+              <span className={`text-sm font-medium px-3 py-1 rounded-full ${saveMsg === 'Saved!' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                {saveMsg}
+              </span>
+            )}
+            <button
+              onClick={() => setShowAddModule(true)}
+              className="px-4 py-2 bg-pendo-pink text-white text-sm font-semibold rounded-lg hover:bg-opacity-90 transition-colors flex items-center gap-1.5"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add Module
+            </button>
+          </div>
         </div>
+
+        {/* Add Module Modal */}
+        {showAddModule && (
+          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+              <h2 className="text-xl font-bold text-pendo-navy mb-4">Add Module</h2>
+              <form onSubmit={addModule} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {CATEGORIES.map(cat => (
+                      <label key={cat.key} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors
+                        ${newModule.category === cat.key ? 'border-pendo-pink bg-pink-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                        <input
+                          type="radio"
+                          name="category"
+                          value={cat.key}
+                          checked={newModule.category === cat.key}
+                          onChange={() => setNewModule(f => ({ ...f, category: cat.key }))}
+                          className="sr-only"
+                        />
+                        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${cat.dot}`} />
+                        <span className={`text-sm font-medium ${newModule.category === cat.key ? 'text-pendo-pink' : 'text-gray-700'}`}>{cat.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Module Title *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newModule.title}
+                    onChange={e => setNewModule(f => ({ ...f, title: e.target.value }))}
+                    placeholder="e.g. Advanced Segmentation"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pendo-pink"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <textarea
+                    value={newModule.description}
+                    onChange={e => setNewModule(f => ({ ...f, description: e.target.value }))}
+                    rows={2}
+                    placeholder="Brief one-line description shown on the learner dashboard"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pendo-pink resize-none"
+                  />
+                </div>
+                <div className="flex gap-3 pt-1">
+                  <button type="submit" disabled={addingSaving}
+                    className="flex-1 py-2 bg-pendo-pink text-white font-semibold rounded-lg hover:bg-opacity-90 disabled:opacity-50 transition-colors text-sm">
+                    {addingSaving ? 'Creating…' : 'Create Module'}
+                  </button>
+                  <button type="button" onClick={() => setShowAddModule(false)}
+                    className="flex-1 py-2 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors text-sm">
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div className="flex items-center justify-center py-24">
