@@ -151,6 +151,25 @@ export function LearnerDashboard() {
           </p>
         </div>
 
+        {/* Progress overview */}
+        {modules.length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold text-pendo-navy">Overall Progress</h2>
+              <span className="text-sm text-gray-500">{completedCount}/{modules.length} modules</span>
+            </div>
+            <ProgressBar completed={completedCount} total={modules.length} showLabel={false} />
+            {completedCount === modules.length && modules.length > 0 && (
+              <div className="mt-4 flex items-center gap-2 text-green-700 text-sm font-medium">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Congratulations — you've completed all modules!
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Certifications */}
         {certifications.length > 0 && (
           <div className="mb-8">
@@ -198,25 +217,6 @@ export function LearnerDashboard() {
         {/* Link modal */}
         {modalLink && (
           <LinkModal url={modalLink.url} title={modalLink.title} onClose={() => setModalLink(null)} />
-        )}
-
-        {/* Progress overview */}
-        {modules.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="font-semibold text-pendo-navy">Overall Progress</h2>
-              <span className="text-sm text-gray-500">{completedCount}/{modules.length} modules</span>
-            </div>
-            <ProgressBar completed={completedCount} total={modules.length} showLabel={false} />
-            {completedCount === modules.length && modules.length > 0 && (
-              <div className="mt-4 flex items-center gap-2 text-green-700 text-sm font-medium">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Congratulations — you've completed all modules!
-              </div>
-            )}
-          </div>
         )}
 
         {/* Module list */}
