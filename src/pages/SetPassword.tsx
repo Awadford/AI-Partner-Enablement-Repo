@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../hooks/useAuth'
 
 export function SetPassword() {
   const navigate = useNavigate()
+  const { profile } = useAuth()
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -46,8 +48,9 @@ export function SetPassword() {
       return
     }
 
-    // Password set — navigate to dashboard (role-based redirect will happen there)
-    navigate('/dashboard', { replace: true })
+    // Password set — navigate based on role
+    const destination = profile?.is_admin || profile?.is_pdm ? '/admin' : '/dashboard'
+    navigate(destination, { replace: true })
   }
 
   if (!ready) {
