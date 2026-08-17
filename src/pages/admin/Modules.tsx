@@ -15,8 +15,8 @@ interface IframeOverrides {
 interface EditState {
   synopsis: string
   why_it_matters: string
-  video_url: string
-  video_url_extension: string
+  videos: { url: string }[]       // overview videos (install module: snippet; others: default)
+  video_url_extension: string     // install only: extension install video
   docs: DocItem[]
   recordings: DocItem[]
   exec_url: string
@@ -59,18 +59,17 @@ export function AdminModules() {
   const [addingSaving, setAddingSaving] = useState(false)
   const [editState, setEditState] = useState<EditState>({
     synopsis: '', why_it_matters: '',
-    video_url: '', video_url_extension: '', docs: [], recordings: [],
+    videos: [], video_url_extension: '', docs: [], recordings: [],
     exec_url: '', exec_prompt: '', iframe_url: '',
     iframe_overrides: { video: false, resources: false, recordings: false, exec: false },
     academy_courses: [],
   })
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState<string | null>(null)
-  const [videoUploadMode, setVideoUploadMode] = useState<UploadMode>('url')
+  const [videoUploadModes, setVideoUploadModes] = useState<UploadMode[]>([])
   const [videoExtUploadMode, setVideoExtUploadMode] = useState<UploadMode>('url')
-  const [videoAddMode, setVideoAddMode] = useState(false)
   const [videoExtAddMode, setVideoExtAddMode] = useState(false)
-  const [uploading, setUploading] = useState<'main' | 'ext' | null>(null)
+  const [uploading, setUploading] = useState<number | 'ext' | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set(['delivery', 'product', 'services', 'gtm'])
@@ -110,14 +109,14 @@ export function AdminModules() {
     setAddingSaving(false)
   }
 
-  async function uploadVideo(file: File, field: 'video_url' | 'video_url_extension') {
+  async function uploadVideo(file: File, target: number | 'ext') {
     const MAX_MB = 50
     if (file.size > MAX_MB * 1024 * 1024) {
       setUploadError(`File too large — max ${MAX_MB}MB. Try compressing the video first.`)
       return
     }
     setUploadError(null)
-    setUploading(field === 'video_url' ? 'main' : 'ext')
+    setUploading(target)
     const safeName = file.name.replace(/[^a-z0-9.\-_]/gi, '-').toLowerCase()
     const path = `${Date.now()}-${safeName}`
     const { data, error } = await supabase.storage
@@ -127,9 +126,13 @@ export function AdminModules() {
       setUploadError(error.message)
     } else if (data) {
       const { data: urlData } = supabase.storage.from('pal-videos').getPublicUrl(data.path)
-      setEditState(s => ({ ...s, [field]: urlData.publicUrl }))
-      if (field === 'video_url') setVideoUploadMode('url')
-      else setVideoExtUploadMode('url')
+      if (target === 'ext') {
+        setEditState(s => ({ ...s, video_url_extension: urlData.publicUrl }))
+        setVideoExtUploadMode('url')
+      } else {
+        setEditState(s => ({ ...s, videos: s.videos.map((v, i) => i === target ? { url: urlData.publicUrl } : v) }))
+        setVideoUploadModes(prev => prev.map((m, i) => i === target ? 'url' : m))
+      }
     }
     setUploading(null)
   }
@@ -138,15 +141,15 @@ export function AdminModules() {
     const { data: fresh } = await supabase.from('lms_modules').select('*').eq('id', mod.id).single()
     const m = (fresh as LmsModule) ?? mod
     setEditing(m.id)
-    setVideoUploadMode('url')
+    const initVideos = m.content?.video_url ? [{ url: m.content.video_url }] : []
+    setVideoUploadModes(initVideos.map(() => 'url' as UploadMode))
     setVideoExtUploadMode('url')
-    setVideoAddMode(!!(m.content?.video_url))
     setVideoExtAddMode(!!(m.content?.video_url_extension))
     setUploadError(null)
     setEditState({
       synopsis: m.content?.synopsis ?? '',
       why_it_matters: m.content?.why_it_matters ?? '',
-      video_url: m.content?.video_url ?? '',
+      videos: initVideos,
       video_url_extension: m.content?.video_url_extension ?? '',
       docs: m.content?.docs?.map((d: DocItem) => ({ ...d })) ?? [],
       recordings: m.content?.recordings?.map((r: DocItem) => ({ ...r })) ?? [],
@@ -169,7 +172,7 @@ export function AdminModules() {
       ...mod.content,
       synopsis: editState.synopsis || undefined,
       why_it_matters: editState.why_it_matters || undefined,
-      video_url: editState.video_url || null,
+      video_url: editState.videos[0]?.url || null,
       video_url_extension: editState.video_url_extension || null,
       docs: editState.docs.filter(d => d.title || d.url),
       recordings: editState.recordings.filter(r => r.title || r.url),
@@ -415,61 +418,71 @@ export function AdminModules() {
                                         <p className="text-xs text-red-600 mb-2">{uploadError}</p>
                                       )}
                                       {isInstallMod(mod) ? (
-                                        /* Install module: show Snippet + Extension video fields */
+                                        /* Install module: Snippet (shared videos array) + Extension */
                                         <div className="space-y-4">
-                                          {/* Snippet / Default video */}
+                                          {/* Snippet / Default video — reuses same videos array */}
                                           <div>
                                             <div className="flex items-center justify-between mb-2">
                                               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Snippet / Default Video</p>
                                               <button type="button"
-                                                onClick={() => { setVideoAddMode(true); setVideoUploadMode('url'); setUploadError(null) }}
+                                                onClick={() => {
+                                                  setEditState(s => ({ ...s, videos: [...s.videos, { url: '' }] }))
+                                                  setVideoUploadModes(prev => [...prev, 'url'])
+                                                  setUploadError(null)
+                                                }}
                                                 className="text-xs text-pendo-pink font-semibold hover:underline flex items-center gap-1">
                                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                                                 Add Video
                                               </button>
                                             </div>
-                                            {!videoAddMode ? (
-                                              <p className="text-xs text-gray-400 italic">No video yet.</p>
-                                            ) : (
-                                              <div className="flex gap-2 items-start">
-                                                <div className="flex-1">
-                                                  <div className="flex gap-1 bg-gray-100 p-0.5 rounded-md mb-1.5 w-fit">
-                                                    {(['url', 'upload'] as UploadMode[]).map(m => (
-                                                      <button key={m} type="button"
-                                                        onClick={() => { setVideoUploadMode(m); setUploadError(null) }}
-                                                        className={`px-2 py-0.5 text-xs font-medium rounded transition-colors ${videoUploadMode === m ? 'bg-white shadow-sm text-pendo-navy' : 'text-gray-500'}`}>
-                                                        {m === 'url' ? '🔗 URL' : '📁 Upload MP4'}
-                                                      </button>
-                                                    ))}
-                                                  </div>
-                                                  {videoUploadMode === 'url' ? (
-                                                    <input type="text" value={editState.video_url}
-                                                      onChange={e => setEditState(s => ({ ...s, video_url: e.target.value }))}
-                                                      placeholder="https://… (YouTube, Vimeo, Loom, or MP4 URL)"
-                                                      className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-pendo-pink" autoFocus />
-                                                  ) : (
-                                                    <div className="flex items-center gap-3">
-                                                      <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border-2 border-dashed cursor-pointer transition-colors text-sm font-medium
-                                                        ${uploading === 'main' ? 'border-pendo-pink bg-pink-50 text-pendo-pink cursor-not-allowed' : 'border-gray-300 hover:border-pendo-pink hover:text-pendo-pink text-gray-500'}`}>
-                                                        {uploading === 'main' ? (
-                                                          <><div className="w-4 h-4 border-2 border-pendo-pink border-t-transparent rounded-full animate-spin" />Uploading…</>
-                                                        ) : (
-                                                          <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>Choose MP4 (max 50MB)</>
-                                                        )}
-                                                        <input type="file" accept="video/mp4,video/webm" disabled={!!uploading} className="sr-only"
-                                                          onChange={e => { const f = e.target.files?.[0]; if (f) uploadVideo(f, 'video_url') }} />
-                                                      </label>
-                                                      {editState.video_url && <span className="text-xs text-green-600 font-medium whitespace-nowrap">✓ Uploaded</span>}
+                                            {editState.videos.length === 0 && <p className="text-xs text-gray-400 italic">No video yet.</p>}
+                                            <div className="space-y-2">
+                                              {editState.videos.map((video, i) => (
+                                                <div key={i} className="flex gap-2 items-start">
+                                                  <div className="flex-1">
+                                                    <div className="flex gap-1 bg-gray-100 p-0.5 rounded-md mb-1.5 w-fit">
+                                                      {(['url', 'upload'] as UploadMode[]).map(m => (
+                                                        <button key={m} type="button"
+                                                          onClick={() => { setVideoUploadModes(prev => prev.map((v, j) => j === i ? m : v)); setUploadError(null) }}
+                                                          className={`px-2 py-0.5 text-xs font-medium rounded transition-colors ${(videoUploadModes[i] ?? 'url') === m ? 'bg-white shadow-sm text-pendo-navy' : 'text-gray-500'}`}>
+                                                          {m === 'url' ? '🔗 URL' : '📁 Upload MP4'}
+                                                        </button>
+                                                      ))}
                                                     </div>
-                                                  )}
+                                                    {(videoUploadModes[i] ?? 'url') === 'url' ? (
+                                                      <input type="text" value={video.url}
+                                                        onChange={e => setEditState(s => ({ ...s, videos: s.videos.map((v, j) => j === i ? { url: e.target.value } : v) }))}
+                                                        placeholder="https://… (YouTube, Vimeo, Loom, Wistia, or MP4 URL)"
+                                                        className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-pendo-pink"
+                                                        autoFocus={i === editState.videos.length - 1 && !video.url} />
+                                                    ) : (
+                                                      <div className="flex items-center gap-3">
+                                                        <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border-2 border-dashed cursor-pointer transition-colors text-sm font-medium
+                                                          ${uploading === i ? 'border-pendo-pink bg-pink-50 text-pendo-pink cursor-not-allowed' : 'border-gray-300 hover:border-pendo-pink hover:text-pendo-pink text-gray-500'}`}>
+                                                          {uploading === i ? (
+                                                            <><div className="w-4 h-4 border-2 border-pendo-pink border-t-transparent rounded-full animate-spin" />Uploading…</>
+                                                          ) : (
+                                                            <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>Choose MP4 (max 50MB)</>
+                                                          )}
+                                                          <input type="file" accept="video/mp4,video/webm" disabled={uploading !== null} className="sr-only"
+                                                            onChange={e => { const f = e.target.files?.[0]; if (f) uploadVideo(f, i) }} />
+                                                        </label>
+                                                        {video.url && <span className="text-xs text-green-600 font-medium whitespace-nowrap">✓ Uploaded</span>}
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                  <button type="button"
+                                                    onClick={() => {
+                                                      setEditState(s => ({ ...s, videos: s.videos.filter((_, j) => j !== i) }))
+                                                      setVideoUploadModes(prev => prev.filter((_, j) => j !== i))
+                                                      setUploadError(null)
+                                                    }}
+                                                    className="text-gray-400 hover:text-red-500 transition-colors mt-6 flex-shrink-0">
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                  </button>
                                                 </div>
-                                                <button type="button"
-                                                  onClick={() => { setEditState(s => ({ ...s, video_url: '' })); setVideoAddMode(false); setUploadError(null) }}
-                                                  className="text-gray-400 hover:text-red-500 transition-colors mt-6 flex-shrink-0">
-                                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                                </button>
-                                              </div>
-                                            )}
+                                              ))}
+                                            </div>
                                           </div>
                                           {/* Extension Install video */}
                                           <div>
@@ -511,7 +524,7 @@ export function AdminModules() {
                                                           <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>Choose MP4 (max 50MB)</>
                                                         )}
                                                         <input type="file" accept="video/mp4,video/webm" disabled={!!uploading} className="sr-only"
-                                                          onChange={e => { const f = e.target.files?.[0]; if (f) uploadVideo(f, 'video_url_extension') }} />
+                                                          onChange={e => { const f = e.target.files?.[0]; if (f) uploadVideo(f, 'ext') }} />
                                                       </label>
                                                       {editState.video_url_extension && <span className="text-xs text-green-600 font-medium whitespace-nowrap">✓ Uploaded</span>}
                                                     </div>
@@ -527,59 +540,71 @@ export function AdminModules() {
                                           </div>
                                         </div>
                                       ) : (
-                                        /* All other modules: single Default Video field */
+                                        /* All other modules: array of video entries */
                                         <div>
                                           <div className="flex items-center justify-between mb-2">
                                             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Overview Video</p>
                                             <button type="button"
-                                              onClick={() => { setVideoAddMode(true); setVideoUploadMode('url'); setUploadError(null) }}
+                                              onClick={() => {
+                                                setEditState(s => ({ ...s, videos: [...s.videos, { url: '' }] }))
+                                                setVideoUploadModes(prev => [...prev, 'url'])
+                                                setUploadError(null)
+                                              }}
                                               className="text-xs text-pendo-pink font-semibold hover:underline flex items-center gap-1">
                                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                                               Add Video
                                             </button>
                                           </div>
-                                          {!videoAddMode ? (
+                                          {editState.videos.length === 0 && (
                                             <p className="text-xs text-gray-400 italic">No video yet.</p>
-                                          ) : (
-                                            <div className="flex gap-2 items-start">
-                                              <div className="flex-1">
-                                                <div className="flex gap-1 bg-gray-100 p-0.5 rounded-md mb-1.5 w-fit">
-                                                  {(['url', 'upload'] as UploadMode[]).map(m => (
-                                                    <button key={m} type="button"
-                                                      onClick={() => { setVideoUploadMode(m); setUploadError(null) }}
-                                                      className={`px-2 py-0.5 text-xs font-medium rounded transition-colors ${videoUploadMode === m ? 'bg-white shadow-sm text-pendo-navy' : 'text-gray-500'}`}>
-                                                      {m === 'url' ? '🔗 URL' : '📁 Upload MP4'}
-                                                    </button>
-                                                  ))}
-                                                </div>
-                                                {videoUploadMode === 'url' ? (
-                                                  <input type="text" value={editState.video_url}
-                                                    onChange={e => setEditState(s => ({ ...s, video_url: e.target.value }))}
-                                                    placeholder="https://… (YouTube, Vimeo, Loom, Wistia, or MP4 URL)"
-                                                    className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-pendo-pink" autoFocus />
-                                                ) : (
-                                                  <div className="flex items-center gap-3">
-                                                    <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border-2 border-dashed cursor-pointer transition-colors text-sm font-medium
-                                                      ${uploading === 'main' ? 'border-pendo-pink bg-pink-50 text-pendo-pink cursor-not-allowed' : 'border-gray-300 hover:border-pendo-pink hover:text-pendo-pink text-gray-500'}`}>
-                                                      {uploading === 'main' ? (
-                                                        <><div className="w-4 h-4 border-2 border-pendo-pink border-t-transparent rounded-full animate-spin" />Uploading…</>
-                                                      ) : (
-                                                        <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>Choose MP4 (max 50MB)</>
-                                                      )}
-                                                      <input type="file" accept="video/mp4,video/webm" disabled={!!uploading} className="sr-only"
-                                                        onChange={e => { const f = e.target.files?.[0]; if (f) uploadVideo(f, 'video_url') }} />
-                                                    </label>
-                                                    {editState.video_url && <span className="text-xs text-green-600 font-medium whitespace-nowrap">✓ Uploaded</span>}
-                                                  </div>
-                                                )}
-                                              </div>
-                                              <button type="button"
-                                                onClick={() => { setEditState(s => ({ ...s, video_url: '' })); setVideoAddMode(false); setUploadError(null) }}
-                                                className="text-gray-400 hover:text-red-500 transition-colors mt-6 flex-shrink-0">
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                              </button>
-                                            </div>
                                           )}
+                                          <div className="space-y-2">
+                                            {editState.videos.map((video, i) => (
+                                              <div key={i} className="flex gap-2 items-start">
+                                                <div className="flex-1">
+                                                  <div className="flex gap-1 bg-gray-100 p-0.5 rounded-md mb-1.5 w-fit">
+                                                    {(['url', 'upload'] as UploadMode[]).map(m => (
+                                                      <button key={m} type="button"
+                                                        onClick={() => { setVideoUploadModes(prev => prev.map((v, j) => j === i ? m : v)); setUploadError(null) }}
+                                                        className={`px-2 py-0.5 text-xs font-medium rounded transition-colors ${(videoUploadModes[i] ?? 'url') === m ? 'bg-white shadow-sm text-pendo-navy' : 'text-gray-500'}`}>
+                                                        {m === 'url' ? '🔗 URL' : '📁 Upload MP4'}
+                                                      </button>
+                                                    ))}
+                                                  </div>
+                                                  {(videoUploadModes[i] ?? 'url') === 'url' ? (
+                                                    <input type="text" value={video.url}
+                                                      onChange={e => setEditState(s => ({ ...s, videos: s.videos.map((v, j) => j === i ? { url: e.target.value } : v) }))}
+                                                      placeholder="https://… (YouTube, Vimeo, Loom, Wistia, or MP4 URL)"
+                                                      className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-pendo-pink"
+                                                      autoFocus={i === editState.videos.length - 1 && !video.url} />
+                                                  ) : (
+                                                    <div className="flex items-center gap-3">
+                                                      <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border-2 border-dashed cursor-pointer transition-colors text-sm font-medium
+                                                        ${uploading === i ? 'border-pendo-pink bg-pink-50 text-pendo-pink cursor-not-allowed' : 'border-gray-300 hover:border-pendo-pink hover:text-pendo-pink text-gray-500'}`}>
+                                                        {uploading === i ? (
+                                                          <><div className="w-4 h-4 border-2 border-pendo-pink border-t-transparent rounded-full animate-spin" />Uploading…</>
+                                                        ) : (
+                                                          <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>Choose MP4 (max 50MB)</>
+                                                        )}
+                                                        <input type="file" accept="video/mp4,video/webm" disabled={uploading !== null} className="sr-only"
+                                                          onChange={e => { const f = e.target.files?.[0]; if (f) uploadVideo(f, i) }} />
+                                                      </label>
+                                                      {video.url && <span className="text-xs text-green-600 font-medium whitespace-nowrap">✓ Uploaded</span>}
+                                                    </div>
+                                                  )}
+                                                </div>
+                                                <button type="button"
+                                                  onClick={() => {
+                                                    setEditState(s => ({ ...s, videos: s.videos.filter((_, j) => j !== i) }))
+                                                    setVideoUploadModes(prev => prev.filter((_, j) => j !== i))
+                                                    setUploadError(null)
+                                                  }}
+                                                  className="text-gray-400 hover:text-red-500 transition-colors mt-6 flex-shrink-0">
+                                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                </button>
+                                              </div>
+                                            ))}
+                                          </div>
                                         </div>
                                       )}
                                     </div>
