@@ -4,7 +4,7 @@ import { Layout } from '../../components/Layout'
 import { useAuth } from '../../hooks/useAuth'
 import { LmsProfile } from '../../types'
 
-const PORTAL_SIGNUP_URL = 'https://ai-partner-enablement-repo.vercel.app/login'
+const PORTAL_SIGNUP_URL = 'https://ai-partner-enablement-repo.vercel.app/login?signup=true'
 
 interface PendingInvite {
   id: string
