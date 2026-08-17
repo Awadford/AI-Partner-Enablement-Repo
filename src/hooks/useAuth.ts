@@ -26,6 +26,27 @@ export function useAuth(): AuthState {
       .single()
 
     if (existing && !fetchError) {
+      // If partner_id is missing and not an admin, try to backfill from domain mapping
+      // (handles users who signed up before their company's domain was added)
+      if (!existing.partner_id && !existing.is_admin) {
+        const domain = (existing.email ?? '').split('@')[1] ?? ''
+        if (domain) {
+          const { data: domainRow } = await supabase
+            .from('lms_partner_domains')
+            .select('partner_id')
+            .eq('domain', domain)
+            .single()
+          if (domainRow?.partner_id) {
+            const { data: updated } = await supabase
+              .from('lms_profiles')
+              .update({ partner_id: domainRow.partner_id })
+              .eq('id', existing.id)
+              .select()
+              .single()
+            return (updated ?? existing) as LmsProfile
+          }
+        }
+      }
       return existing as LmsProfile
     }
 
