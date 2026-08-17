@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Login } from './pages/Login'
+import { SetPassword } from './pages/SetPassword'
 import { LearnerDashboard } from './pages/learner/Dashboard'
 import { ModulePage } from './pages/learner/ModulePage'
 import { AdminDashboard } from './pages/admin/Dashboard'
@@ -15,6 +16,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/set-password" element={<SetPassword />} />
 
         {/* Learner routes */}
         <Route path="/dashboard" element={
