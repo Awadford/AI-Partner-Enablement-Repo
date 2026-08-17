@@ -71,6 +71,7 @@ export function AdminUsers() {
     e.preventDefault()
     setInviteError(null)
     setInviteMsg(null)
+    setInviteLink(null)
     setInviting(true)
 
     const email = inviteEmail.toLowerCase().trim()
@@ -116,7 +117,6 @@ export function AdminUsers() {
     }
 
     setInviteEmail('')
-    setInviteLink(null)
     await load()
     setInviting(false)
   }
