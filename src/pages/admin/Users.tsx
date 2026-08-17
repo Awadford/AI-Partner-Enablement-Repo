@@ -5,6 +5,8 @@ import { useAuth } from '../../hooks/useAuth'
 import { LmsProfile } from '../../types'
 
 const PORTAL_SIGNUP_URL = 'https://ai-partner-enablement-repo.vercel.app/login'
+const INVITE_SECRET = import.meta.env.VITE_INVITE_SECRET ?? ''
+const SUPABASE_FUNCTIONS_URL = 'https://nvzkmqumglqlvkrokzkn.supabase.co/functions/v1'
 
 interface PendingInvite {
   id: string
@@ -26,6 +28,7 @@ export function AdminUsers() {
   const [inviteRole, setInviteRole] = useState<'admin' | 'pdm'>('admin')
   const [inviting, setInviting] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
+  const [inviteMsg, setInviteMsg] = useState<{ type: 'success' | 'warning'; text: string } | null>(null)
   const [copiedLink, setCopiedLink] = useState(false)
 
   useEffect(() => {
@@ -65,21 +68,49 @@ export function AdminUsers() {
   async function sendInvite(e: React.FormEvent) {
     e.preventDefault()
     setInviteError(null)
+    setInviteMsg(null)
     setInviting(true)
 
-    const { error } = await supabase.from('lms_user_invites').insert({
-      email: inviteEmail.toLowerCase().trim(),
+    const email = inviteEmail.toLowerCase().trim()
+
+    // 1. Pre-provision role in lms_user_invites
+    const { error: dbError } = await supabase.from('lms_user_invites').insert({
+      email,
       is_admin: inviteRole === 'admin',
       is_pdm: inviteRole === 'pdm',
       invited_by: currentUser?.id ?? null,
     })
 
-    if (error) {
-      setInviteError(error.message.includes('unique') ? 'An invite for this email already exists.' : error.message)
-    } else {
-      setInviteEmail('')
-      await load()
+    if (dbError) {
+      setInviteError(dbError.message.includes('unique') ? 'An invite for this email already exists.' : dbError.message)
+      setInviting(false)
+      return
     }
+
+    // 2. Send invite email via Edge Function
+    try {
+      const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/invite-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-invite-secret': INVITE_SECRET,
+        },
+        body: JSON.stringify({ email }),
+      })
+      const json = await res.json()
+      if (json.warning) {
+        setInviteMsg({ type: 'warning', text: json.warning })
+      } else if (json.error) {
+        setInviteMsg({ type: 'warning', text: `Role saved, but email failed: ${json.error}` })
+      } else {
+        setInviteMsg({ type: 'success', text: `Invite email sent to ${email}.` })
+      }
+    } catch {
+      setInviteMsg({ type: 'warning', text: 'Role saved, but could not send invite email. Share the link manually.' })
+    }
+
+    setInviteEmail('')
+    await load()
     setInviting(false)
   }
 
@@ -139,6 +170,11 @@ export function AdminUsers() {
               </form>
               {inviteError && (
                 <p className="text-red-600 text-sm mt-2">{inviteError}</p>
+              )}
+              {inviteMsg && (
+                <p className={`text-sm mt-2 ${inviteMsg.type === 'success' ? 'text-green-600' : 'text-amber-600'}`}>
+                  {inviteMsg.text}
+                </p>
               )}
               <div className="mt-4 flex items-center gap-3 text-sm text-gray-500">
                 <span>Share the signup link with them:</span>
