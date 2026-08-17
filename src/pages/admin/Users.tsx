@@ -5,8 +5,6 @@ import { useAuth } from '../../hooks/useAuth'
 import { LmsProfile } from '../../types'
 
 const PORTAL_SIGNUP_URL = 'https://ai-partner-enablement-repo.vercel.app/login'
-const INVITE_SECRET = import.meta.env.VITE_INVITE_SECRET ?? ''
-const SUPABASE_FUNCTIONS_URL = 'https://nvzkmqumglqlvkrokzkn.supabase.co/functions/v1'
 
 interface PendingInvite {
   id: string
@@ -90,31 +88,9 @@ export function AdminUsers() {
       return
     }
 
-    // 2. Generate invite link via Edge Function
-    try {
-      const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/invite-user`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-invite-secret': INVITE_SECRET,
-        },
-        body: JSON.stringify({ email }),
-      })
-      const json = await res.json()
-      if (json.link) {
-        setInviteLink(json.link)
-        setInviteMsg({
-          type: json.warning ? 'warning' : 'success',
-          text: json.warning ?? `Invite link generated for ${email}. Copy and send it directly:`,
-        })
-      } else if (json.warning) {
-        setInviteMsg({ type: 'warning', text: json.warning })
-      } else if (json.error) {
-        setInviteMsg({ type: 'warning', text: `Role saved, but link generation failed: ${json.error}` })
-      }
-    } catch {
-      setInviteMsg({ type: 'warning', text: 'Role saved. Share the portal link manually so they can sign up.' })
-    }
+    // 2. Show the portal signup URL for the admin to share
+    setInviteLink(PORTAL_SIGNUP_URL)
+    setInviteMsg({ type: 'success', text: `${email} added. Share the signup link below — their role will be applied automatically when they create an account.` })
 
     setInviteEmail('')
     await load()
