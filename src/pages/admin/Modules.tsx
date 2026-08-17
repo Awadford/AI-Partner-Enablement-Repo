@@ -421,14 +421,12 @@ export function AdminModules() {
                                           <div>
                                             <div className="flex items-center justify-between mb-2">
                                               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Snippet / Default Video</p>
-                                              {!videoAddMode && (
-                                                <button type="button"
-                                                  onClick={() => { setVideoAddMode(true); setVideoUploadMode('url'); setUploadError(null) }}
-                                                  className="text-xs text-pendo-pink font-semibold hover:underline flex items-center gap-1">
-                                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                                                  Add Video
-                                                </button>
-                                              )}
+                                              <button type="button"
+                                                onClick={() => { setVideoAddMode(true); setVideoUploadMode('url'); setUploadError(null) }}
+                                                className="text-xs text-pendo-pink font-semibold hover:underline flex items-center gap-1">
+                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                                                Add Video
+                                              </button>
                                             </div>
                                             {!videoAddMode ? (
                                               <p className="text-xs text-gray-400 italic">No video yet.</p>
@@ -477,14 +475,12 @@ export function AdminModules() {
                                           <div>
                                             <div className="flex items-center justify-between mb-2">
                                               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Extension Install Video</p>
-                                              {!videoExtAddMode && (
-                                                <button type="button"
-                                                  onClick={() => { setVideoExtAddMode(true); setVideoExtUploadMode('url'); setUploadError(null) }}
-                                                  className="text-xs text-pendo-pink font-semibold hover:underline flex items-center gap-1">
-                                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                                                  Add Video
-                                                </button>
-                                              )}
+                                              <button type="button"
+                                                onClick={() => { setVideoExtAddMode(true); setVideoExtUploadMode('url'); setUploadError(null) }}
+                                                className="text-xs text-pendo-pink font-semibold hover:underline flex items-center gap-1">
+                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                                                Add Video
+                                              </button>
                                             </div>
                                             {!videoExtAddMode ? (
                                               <p className="text-xs text-gray-400 italic">No video yet.</p>
@@ -535,14 +531,12 @@ export function AdminModules() {
                                         <div>
                                           <div className="flex items-center justify-between mb-2">
                                             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Overview Video</p>
-                                            {!videoAddMode && (
-                                              <button type="button"
-                                                onClick={() => { setVideoAddMode(true); setVideoUploadMode('url'); setUploadError(null) }}
-                                                className="text-xs text-pendo-pink font-semibold hover:underline flex items-center gap-1">
-                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                                                Add Video
-                                              </button>
-                                            )}
+                                            <button type="button"
+                                              onClick={() => { setVideoAddMode(true); setVideoUploadMode('url'); setUploadError(null) }}
+                                              className="text-xs text-pendo-pink font-semibold hover:underline flex items-center gap-1">
+                                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                                              Add Video
+                                            </button>
                                           </div>
                                           {!videoAddMode ? (
                                             <p className="text-xs text-gray-400 italic">No video yet.</p>
