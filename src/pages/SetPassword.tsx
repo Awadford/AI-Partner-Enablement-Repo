@@ -11,11 +11,20 @@ export function SetPassword() {
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [ready, setReady] = useState(false)
+  const [expired, setExpired] = useState(false)
 
-  // Supabase fires an auth state change with type 'SIGNED_IN' when the invite
-  // token in the URL hash is exchanged for a session. Wait for that before
-  // allowing the user to set their password.
   useEffect(() => {
+    // Check for error in URL hash (e.g. expired/already-used token)
+    const hash = window.location.hash
+    if (hash.includes('error=')) {
+      const params = new URLSearchParams(hash.replace('#', ''))
+      const desc = params.get('error_description')
+      if (desc?.includes('expired') || desc?.includes('invalid')) {
+        setExpired(true)
+        return
+      }
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) setReady(true)
     })
@@ -51,6 +60,31 @@ export function SetPassword() {
     // Password set — navigate based on role
     const destination = profile?.is_admin || profile?.is_pdm ? '/admin' : '/dashboard'
     navigate(destination, { replace: true })
+  }
+
+  if (expired) {
+    return (
+      <div className="min-h-screen bg-pendo-navy flex items-center justify-center px-4">
+        <div className="w-full max-w-sm text-center">
+          <div className="w-14 h-14 rounded-2xl bg-pendo-pink flex items-center justify-center mx-auto mb-4">
+            <span className="text-white font-bold text-2xl">P</span>
+          </div>
+          <div className="bg-white rounded-2xl shadow-xl p-8">
+            <div className="text-4xl mb-3">⏱</div>
+            <h2 className="text-lg font-bold text-pendo-navy mb-2">Invite link expired</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              This link has already been used or expired. Ask your Pendo admin to generate a new invite link for you.
+            </p>
+            <a
+              href="/login"
+              className="block w-full py-2.5 bg-pendo-pink text-white rounded-lg font-semibold text-sm hover:bg-pendo-pink-dark transition-colors text-center"
+            >
+              Go to sign in
+            </a>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (!ready) {
