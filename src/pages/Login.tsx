@@ -8,7 +8,7 @@ export function Login() {
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const searchParams = new URLSearchParams(useLocation().search)
-  const [mode, setMode] = useState<'login' | 'signup'>(searchParams.get('signup') === 'true' ? 'signup' : 'login')
+  const [mode, setMode] = useState<'login' | 'signup' | 'reset'>(searchParams.get('signup') === 'true' ? 'signup' : 'login')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
@@ -33,6 +33,19 @@ export function Login() {
     setError(null)
     setMessage(null)
     setLoading(true)
+
+    if (mode === 'reset') {
+      const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: 'https://ai-partner-enablement-repo.vercel.app/set-password',
+      })
+      if (err) {
+        setError(err.message)
+      } else {
+        setMessage('Check your email for a password reset link.')
+      }
+      setLoading(false)
+      return
+    }
 
     if (mode === 'login') {
       const { error: err } = await supabase.auth.signInWithPassword({ email, password })
@@ -95,6 +108,30 @@ export function Login() {
             </button>
           </div>
 
+          {mode === 'reset' ? (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <p className="text-sm text-gray-500">Enter your email and we'll send you a link to reset your password.</p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Work Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-pendo-pink focus:border-transparent outline-none text-sm"
+                  placeholder="you@company.com"
+                  required
+                />
+              </div>
+              {error && <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{error}</div>}
+              {message && <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700">{message}</div>}
+              <button type="submit" disabled={loading} className="w-full py-2.5 bg-pendo-pink text-white rounded-lg font-semibold hover:bg-pendo-pink-dark transition-colors disabled:opacity-60">
+                {loading ? 'Sending…' : 'Send reset link'}
+              </button>
+              <button type="button" onClick={() => { setMode('login'); setError(null); setMessage(null) }} className="w-full text-sm text-gray-500 hover:text-pendo-navy transition-colors">
+                Back to sign in
+              </button>
+            </form>
+          ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'signup' && (
               <div>
@@ -151,7 +188,17 @@ export function Login() {
             >
               {loading ? 'Please wait…' : mode === 'login' ? 'Sign In' : 'Create Account'}
             </button>
+            {mode === 'login' && (
+              <button
+                type="button"
+                onClick={() => { setMode('reset'); setError(null); setMessage(null) }}
+                className="w-full text-sm text-gray-400 hover:text-pendo-navy transition-colors"
+              >
+                Forgot password?
+              </button>
+            )}
           </form>
+          )}
         </div>
 
         <p className="text-center text-gray-400 text-xs mt-6">
