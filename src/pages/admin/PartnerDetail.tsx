@@ -68,6 +68,8 @@ export function AdminPartnerDetail() {
   const [csvImporting, setCsvImporting] = useState(false)
   const [csvMsg, setCsvMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
+  const [expandedLearnerId, setExpandedLearnerId] = useState<string | null>(null)
+
   // Inline learner editing
   const [editingRowId, setEditingRowId] = useState<string | null>(null)
   const [editingRowType, setEditingRowType] = useState<'learner' | 'pending' | null>(null)
@@ -388,6 +390,37 @@ export function AdminPartnerDetail() {
         const next = new Set(l.earnedCertIds)
         next.add(certId)
         return { ...l, earnedCertIds: next }
+      }))
+    }
+  }
+
+  const toggleModuleComplete = async (learner: LearnerRow, moduleId: string) => {
+    const isCompleted = learner.moduleProgress[moduleId] === 'completed'
+    if (isCompleted) {
+      // Mark incomplete — delete the progress row
+      await supabase.from('lms_user_progress')
+        .delete()
+        .eq('user_id', learner.id)
+        .eq('module_id', moduleId)
+      setLearners(prev => prev.map(l => {
+        if (l.id !== learner.id) return l
+        const mp = { ...l.moduleProgress }
+        delete mp[moduleId]
+        const completed = Object.values(mp).filter(s => s === 'completed').length
+        return { ...l, moduleProgress: mp, completed }
+      }))
+    } else {
+      // Mark complete
+      const now = new Date().toISOString()
+      await supabase.from('lms_user_progress').upsert(
+        [{ user_id: learner.id, module_id: moduleId, status: 'completed', started_at: now, completed_at: now }],
+        { onConflict: 'user_id,module_id' }
+      )
+      setLearners(prev => prev.map(l => {
+        if (l.id !== learner.id) return l
+        const mp = { ...l.moduleProgress, [moduleId]: 'completed' as const }
+        const completed = Object.values(mp).filter(s => s === 'completed').length
+        return { ...l, moduleProgress: mp, completed }
       }))
     }
   }
@@ -912,6 +945,7 @@ export function AdminPartnerDetail() {
                         <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-4">Name</th>
                         <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-4">Email</th>
                         <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-4">Title</th>
+                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-4">Modules</th>
                         {enabledCerts.map(c => (
                           <th key={c.id} className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-4">
                             {c.title.replace('Pendo Essentials for ', '').replace('Pendo Certification: ', '').replace('Pendo for ', '')}
@@ -924,7 +958,11 @@ export function AdminPartnerDetail() {
                       {/* Active learners */}
                       {filteredLearners.map(l => {
                         const isEditing = editingRowId === l.id && editingRowType === 'learner'
+                        const isExpanded = expandedLearnerId === l.id
+                        const enabledModules = modules.filter(m => m.pm?.enabled)
+                        const completedCount = enabledModules.filter(m => l.moduleProgress[m.id] === 'completed').length
                         return (
+                          <>
                           <tr key={l.id} className="hover:bg-gray-50">
                             <td className="py-2 pr-3">
                               {isEditing ? (
@@ -952,6 +990,17 @@ export function AdminPartnerDetail() {
                               ) : (
                                 <span className="text-sm text-gray-500">{l.title ?? '—'}</span>
                               )}
+                            </td>
+                            <td className="py-2 pr-3">
+                              <button
+                                onClick={() => setExpandedLearnerId(isExpanded ? null : l.id)}
+                                className="inline-flex items-center gap-1.5 text-xs font-medium text-pendo-navy hover:text-pendo-pink transition-colors"
+                              >
+                                <svg className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                                </svg>
+                                <span>{completedCount}/{enabledModules.length}</span>
+                              </button>
                             </td>
                             {enabledCerts.map(c => (
                               <td key={c.id} className="py-2 pr-3">
@@ -992,6 +1041,40 @@ export function AdminPartnerDetail() {
                               )}
                             </td>
                           </tr>
+                          {isExpanded && (
+                            <tr key={`${l.id}-modules`} className="bg-gray-50">
+                              <td colSpan={totalCols + 1} className="px-4 py-3">
+                                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Module Progress</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                                  {enabledModules.map(m => {
+                                    const isComplete = l.moduleProgress[m.id] === 'completed'
+                                    return (
+                                      <button
+                                        key={m.id}
+                                        onClick={() => toggleModuleComplete(l, m.id)}
+                                        title={isComplete ? 'Completed — click to mark incomplete' : 'Not completed — click to mark complete'}
+                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-left transition-colors
+                                          ${isComplete
+                                            ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                            : 'bg-white border border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-600'}`}
+                                      >
+                                        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={isComplete ? 2.5 : 1.5} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        <span className="truncate">{m.title}</span>
+                                        <span className={`ml-auto flex-shrink-0 text-xs px-1.5 py-0.5 rounded-full ${
+                                          m.category === 'delivery' ? 'bg-blue-100 text-blue-600' :
+                                          m.category === 'product' ? 'bg-purple-100 text-purple-600' :
+                                          m.category === 'services' ? 'bg-orange-100 text-orange-600' :
+                                          'bg-green-100 text-green-600'}`}>{m.category}</span>
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                          </>
                         )
                       })}
 
