@@ -16,6 +16,7 @@ const categoryColors: Record<string, string> = {
   delivery: 'bg-blue-100 text-blue-700',
   product: 'bg-purple-100 text-purple-700',
   services: 'bg-orange-100 text-orange-700',
+  gtm: 'bg-green-100 text-green-700',
 }
 
 export function ModuleCard({ module, index }: ModuleCardProps) {
