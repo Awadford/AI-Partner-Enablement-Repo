@@ -733,7 +733,33 @@ export function AdminPartnerDetail() {
 
           {/* Modules */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="font-semibold text-pendo-navy text-lg mb-2">Modules</h2>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="font-semibold text-pendo-navy text-lg">Modules</h2>
+              {(() => {
+                const allEnabled = modules.length > 0 && modules.every(m => m.pm?.enabled)
+                const anyEnabled = modules.some(m => m.pm?.enabled)
+                return (
+                  <button
+                    onClick={async () => {
+                      const target = !allEnabled
+                      const updated = await Promise.all(modules.map(async mod => {
+                        if (mod.pm) {
+                          await supabase.from('lms_partner_modules').update({ enabled: target }).eq('id', mod.pm.id)
+                        } else {
+                          await supabase.from('lms_partner_modules')
+                            .insert([{ partner_id: partnerId, module_id: mod.id, enabled: target, order_index: mod.default_order }])
+                        }
+                        return { ...mod, pm: mod.pm ? { ...mod.pm, enabled: target } : { id: '', partner_id: partnerId!, module_id: mod.id, enabled: target, order_index: mod.default_order, created_at: new Date().toISOString() } }
+                      }))
+                      setModules(updated)
+                    }}
+                    className="text-xs font-semibold text-pendo-pink hover:underline"
+                  >
+                    {allEnabled ? 'Deselect all' : anyEnabled ? 'Select all' : 'Select all'}
+                  </button>
+                )
+              })()}
+            </div>
             <p className="text-sm text-gray-500 mb-4">
               Toggle which modules this partner's learners can access. Use arrows to reorder.
             </p>
