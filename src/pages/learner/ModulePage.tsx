@@ -355,6 +355,7 @@ export function ModulePage() {
 
         <div className="space-y-4">
           {/* 1. Learn — Video */}
+          {(content.video_url || content.video_url_extension || isAcademySection('video') || sectionIframe('video')) && (
           <Section
             title={isAcademySection('video') || sectionIframe('video') ? courseBlockLabel : 'Learn — Overview Video'}
             icon={
@@ -379,17 +380,9 @@ export function ModulePage() {
               ) : (
                 <VideoPlayer url={content.video_url} title={module.title} onOpenModal={(url, t) => setModalLink({ url, title: t })} />
               )
-            ) : (
-              <div className="aspect-video rounded-lg bg-gray-100 flex items-center justify-center">
-                <div className="text-center text-gray-400">
-                  <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.263a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                  <p className="text-sm">Video coming soon</p>
-                </div>
-              </div>
             )}
           </Section>
+          )}
 
           {/* 2. Resources */}
           {(docs.length > 0 || isAcademySection('resources') || sectionIframe('resources')) && (
@@ -541,7 +534,7 @@ export function ModulePage() {
           )}
 
           {/* 5. Record — exec.com */}
-          {(content.exec_prompt || content.exec_url || isAcademySection('exec') || sectionIframe('exec')) && (
+          {((content.exec_url || (content.exec_prompt && content.exec_url)) || isAcademySection('exec') || sectionIframe('exec')) && (
             <Section
               title={isAcademySection('exec') || sectionIframe('exec') ? courseBlockLabel : 'Record — Practice with exec.com'}
               icon={
