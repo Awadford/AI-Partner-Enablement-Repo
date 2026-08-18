@@ -1058,9 +1058,10 @@ export function AdminPartnerDetail() {
                                             ? 'bg-green-100 text-green-700 hover:bg-green-200'
                                             : 'bg-white border border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-600'}`}
                                       >
-                                        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={isComplete ? 2.5 : 1.5} d="M5 13l4 4L19 7" />
-                                        </svg>
+                                        {isComplete
+                                          ? <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                                          : <span className="w-3.5 h-3.5 flex-shrink-0 flex items-center justify-center text-gray-300 font-bold text-sm leading-none">—</span>
+                                        }
                                         <span className="truncate">{m.title}</span>
                                         <span className={`ml-auto flex-shrink-0 text-xs px-1.5 py-0.5 rounded-full ${
                                           m.category === 'delivery' ? 'bg-blue-100 text-blue-600' :
