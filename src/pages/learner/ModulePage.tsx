@@ -217,15 +217,22 @@ export function ModulePage() {
   const academyCourses: { label: string; url: string }[] = content.academy_courses ?? []
   const overrides = content.iframe_overrides ?? {}
   const hasAcademy = academyCourses.length > 0
+  // Determine course provider from URLs for labelling
+  const isExecCourse = academyCourses.some(c => c.url.includes('exec.com'))
+  const courseBlockLabel = isExecCourse ? 'Exec Course' : 'Academy Course'
   // Legacy fallback: per-section or single iframe URL
   const legacyIframeUrls = content.iframe_urls ?? {}
   const legacyIframeUrl = content.iframe_url
   const legacyOverrides = content.iframe_overrides ?? {}
   const sectionIframe = (section: 'video' | 'resources' | 'recordings' | 'exec'): string | null =>
     legacyIframeUrls[section] || (legacyOverrides[section] ? legacyIframeUrl ?? null : null)
-  // Returns true if this section should show the Academy Courses block
+  // Only ONE section shows the academy/exec block — the first enabled one by priority
+  const academySectionOrder = ['exec', 'video', 'resources', 'recordings'] as const
+  const academyTargetSection = hasAcademy
+    ? academySectionOrder.find(s => !!overrides[s]) ?? null
+    : null
   const isAcademySection = (section: 'video' | 'resources' | 'recordings' | 'exec') =>
-    hasAcademy && !!overrides[section]
+    academyTargetSection === section
 
   // Renders the Academy/iframe embed used when a section is overridden
   const IframeEmbed = ({ title, url }: { title: string; url: string }) => {
@@ -349,7 +356,7 @@ export function ModulePage() {
         <div className="space-y-4">
           {/* 1. Learn — Video */}
           <Section
-            title={isAcademySection('video') || sectionIframe('video') ? 'Academy Courses' : 'Learn — Overview Video'}
+            title={isAcademySection('video') || sectionIframe('video') ? courseBlockLabel : 'Learn — Overview Video'}
             icon={
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
@@ -387,7 +394,7 @@ export function ModulePage() {
           {/* 2. Resources */}
           {(docs.length > 0 || isAcademySection('resources') || sectionIframe('resources')) && (
             <Section
-              title={isAcademySection('resources') || sectionIframe('resources') ? 'Academy Courses' : 'Resources'}
+              title={isAcademySection('resources') || sectionIframe('resources') ? courseBlockLabel : 'Resources'}
               icon={
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -483,7 +490,7 @@ export function ModulePage() {
           {/* 4. Watch — Customer Recordings */}
           {(recordings.length > 0 || isAcademySection('recordings') || sectionIframe('recordings')) && (
             <Section
-              title={isAcademySection('recordings') || sectionIframe('recordings') ? 'Academy Courses' : 'Watch — Customer Recordings'}
+              title={isAcademySection('recordings') || sectionIframe('recordings') ? courseBlockLabel : 'Watch — Customer Recordings'}
               icon={
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.263a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -536,7 +543,7 @@ export function ModulePage() {
           {/* 5. Record — exec.com */}
           {(content.exec_prompt || content.exec_url || isAcademySection('exec') || sectionIframe('exec')) && (
             <Section
-              title={isAcademySection('exec') || sectionIframe('exec') ? 'Academy Courses' : 'Record — Practice with exec.com'}
+              title={isAcademySection('exec') || sectionIframe('exec') ? courseBlockLabel : 'Record — Practice with exec.com'}
               icon={
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
