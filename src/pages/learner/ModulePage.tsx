@@ -137,7 +137,7 @@ export function ModulePage() {
   const [expandedHtmlDoc, setExpandedHtmlDoc] = useState<number | null>(null)
   const [markedComplete, setMarkedComplete] = useState(false)
   const [modalLink, setModalLink] = useState<{ url: string; title: string } | null>(null)
-  const [execAttempted, setExecAttempted] = useState(false)
+  const [execPassed, setExecPassed] = useState(false)
   const [selectedCourse, setSelectedCourse] = useState(0)
   const [nextModuleId, setNextModuleId] = useState<string | null>(null)
 
@@ -179,35 +179,31 @@ export function ModulePage() {
     load()
   }, [moduleId, profile?.id])
 
-  // Listen for exec.com postMessage completion events (works for both embedded and new-tab flows)
+  // Listen for exec.com postMessage completion events
   useEffect(() => {
     const handleMessage = async (e: MessageEvent) => {
-      // For embedded iframes (singleIframeMode), listen from the start.
-      // For new-tab flow, only listen after the user has opened exec.com.
       const data = e.data
-      const isComplete =
+      const isPassed =
         data?.type === 'scenario_complete' ||
         data?.type === 'session_complete' ||
         data?.type === 'roleplay_complete' ||
         data?.event === 'complete' ||
         data?.status === 'passed' ||
         data?.status === 'completed'
-      if (isComplete && moduleId) {
+      if (isPassed && moduleId) {
         setCompleting(true)
         const ok = await markComplete(moduleId)
         if (ok) {
           setMarkedComplete(true)
-          // Auto-navigate to next module after a brief pause
-          setTimeout(() => {
-            navigate(nextModuleId ? `/module/${nextModuleId}` : '/dashboard')
-          }, 1500)
+          setExecPassed(true)
+          // singleIframeMode (academy course) auto-navigates; exec scenario modules wait for user click
         }
         setCompleting(false)
       }
     }
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
-  }, [moduleId, nextModuleId])
+  }, [moduleId])
 
   const currentStatus = moduleId ? progress[moduleId]?.status ?? 'not_started' : 'not_started'
   const isCompleted = currentStatus === 'completed' || markedComplete
@@ -216,13 +212,12 @@ export function ModulePage() {
     if (!moduleId) return
     setCompleting(true)
     const ok = await markComplete(moduleId)
-    if (ok) {
-      setMarkedComplete(true)
-      setTimeout(() => {
-        navigate(nextModuleId ? `/module/${nextModuleId}` : '/dashboard')
-      }, 1500)
-    }
+    if (ok) setMarkedComplete(true)
     setCompleting(false)
+  }
+
+  const handleContinue = () => {
+    navigate(nextModuleId ? `/module/${nextModuleId}` : '/dashboard')
   }
 
   if (loading) {
@@ -589,26 +584,22 @@ export function ModulePage() {
               ) : sectionIframe('exec') ? (
                 <IframeEmbed title={`${module.title} — Practice`} url={sectionIframe('exec')!} />
               ) : (<>
-              {/* Prompt / instructions always shown if present */}
+              {/* Prompt shown above the iframe if present */}
               {content.exec_prompt && (
-                <div className="mb-5">
+                <div className="mb-4">
                   <p className="text-sm font-medium text-pendo-navy mb-2">Your practice prompt:</p>
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
                     <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{content.exec_prompt}</p>
                   </div>
                 </div>
               )}
-
-              {/* Open exec.com as full-screen modal */}
-              <button
-                onClick={() => { window.open(content.exec_url!, '_blank'); setExecAttempted(true) }}
-                className="inline-flex items-center gap-2 bg-pendo-navy text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-opacity-90 transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-                Open exec.com
-              </button>
+              {/* Inline exec.com iframe — fills the section */}
+              <IframeEmbed
+                title={`${module.title} — Practice Scenario`}
+                url={content.exec_url!}
+                height="calc(80vh)"
+                embedTimeout={60000}
+              />
               </>)}
             </Section>
             )
@@ -624,49 +615,74 @@ export function ModulePage() {
             Back to Dashboard
           </Link>
 
-          {isCompleted ? (
-            <div className="flex items-center gap-2 text-green-700 font-medium">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              {completing ? 'Saving…' : `Module Complete — ${nextModuleId ? 'navigating to next module…' : 'returning to dashboard…'}`}
-            </div>
-          ) : singleIframeMode ? (
-            // Embedded exec course — completion is automatic via postMessage, no button needed
-            <p className="text-sm text-gray-400 italic">Complete the course above to unlock the next module</p>
-          ) : content.exec_url ? (
-            // New-tab exec flow — show manual fallback after they've opened exec.com
-            execAttempted ? (
+          {/* Exec-gated modules (includes singleIframeMode academy courses) */}
+          {(content.exec_url || singleIframeMode) ? (
+            isCompleted || execPassed ? (
+              // Passed — Continue button active
               <div className="flex flex-col items-end gap-1">
                 <button
-                  onClick={handleMarkComplete}
-                  disabled={completing}
-                  className="flex items-center gap-2 bg-pendo-pink text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-pendo-pink-dark transition-colors disabled:opacity-60"
+                  onClick={handleContinue}
+                  className="flex items-center gap-2 bg-pendo-pink text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-opacity-90 transition-colors"
                 >
                   {completing ? (
                     <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving…</>
                   ) : (
-                    <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>I've Completed the Scenario</>
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                      {nextModuleId ? 'Continue to Next Module' : 'Back to Dashboard'}
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                      </svg>
+                    </>
                   )}
                 </button>
-                <p className="text-xs text-gray-400">Only mark complete after finishing the exec.com practice session</p>
+                <p className="text-xs text-green-600 font-medium">Scenario passed ✓</p>
               </div>
             ) : (
-              <p className="text-sm text-gray-400 italic">Complete the practice scenario above to unlock the next module</p>
+              // Not yet passed — locked Continue button
+              <div className="flex flex-col items-end gap-1">
+                <button
+                  disabled
+                  className="flex items-center gap-2 bg-gray-200 text-gray-400 px-6 py-2.5 rounded-lg font-semibold cursor-not-allowed"
+                >
+                  {nextModuleId ? 'Continue to Next Module' : 'Back to Dashboard'}
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </button>
+                <p className="text-xs text-gray-400">Pass the scenario above to continue</p>
+              </div>
             )
           ) : (
-            // Non-exec modules: standard mark complete
-            <button
-              onClick={handleMarkComplete}
-              disabled={completing}
-              className="flex items-center gap-2 bg-pendo-pink text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-pendo-pink-dark transition-colors disabled:opacity-60"
-            >
-              {completing ? (
-                <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving…</>
-              ) : (
-                <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>Mark Complete</>
-              )}
-            </button>
+            // Non-exec modules: standard mark complete → Continue
+            isCompleted ? (
+              <button
+                onClick={handleContinue}
+                className="flex items-center gap-2 bg-pendo-pink text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-opacity-90 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                </svg>
+                {nextModuleId ? 'Continue to Next Module' : 'Back to Dashboard'}
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </button>
+            ) : (
+              <button
+                onClick={handleMarkComplete}
+                disabled={completing}
+                className="flex items-center gap-2 bg-pendo-pink text-white px-6 py-2.5 rounded-lg font-semibold hover:bg-opacity-90 transition-colors disabled:opacity-60"
+              >
+                {completing ? (
+                  <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving…</>
+                ) : (
+                  <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>Mark Complete</>
+                )}
+              </button>
+            )
           )}
         </div>
       </div>
