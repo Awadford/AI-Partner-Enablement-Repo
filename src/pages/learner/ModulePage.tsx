@@ -139,6 +139,7 @@ export function ModulePage() {
   const [modalLink, setModalLink] = useState<{ url: string; title: string } | null>(null)
   const [execAttempted, setExecAttempted] = useState(false)
   const [selectedCourse, setSelectedCourse] = useState(0)
+  const [nextModuleId, setNextModuleId] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -160,16 +161,30 @@ export function ModulePage() {
       if (profile?.id) {
         await markInProgress(moduleId)
       }
+
+      // Find next module in this partner's learning path
+      if (profile?.partner_id) {
+        const { data: pms } = await supabase
+          .from('lms_partner_modules')
+          .select('module_id, order_index')
+          .eq('partner_id', profile.partner_id)
+          .eq('enabled', true)
+          .order('order_index')
+        if (pms) {
+          const idx = pms.findIndex(pm => pm.module_id === moduleId)
+          setNextModuleId(pms[idx + 1]?.module_id ?? null)
+        }
+      }
     }
     load()
   }, [moduleId, profile?.id])
 
-  // Listen for exec.com postMessage completion events
+  // Listen for exec.com postMessage completion events (works for both embedded and new-tab flows)
   useEffect(() => {
     const handleMessage = async (e: MessageEvent) => {
-      if (!execAttempted) return
+      // For embedded iframes (singleIframeMode), listen from the start.
+      // For new-tab flow, only listen after the user has opened exec.com.
       const data = e.data
-      // exec.com / common scenario platform completion signals
       const isComplete =
         data?.type === 'scenario_complete' ||
         data?.type === 'session_complete' ||
@@ -180,13 +195,19 @@ export function ModulePage() {
       if (isComplete && moduleId) {
         setCompleting(true)
         const ok = await markComplete(moduleId)
-        if (ok) setMarkedComplete(true)
+        if (ok) {
+          setMarkedComplete(true)
+          // Auto-navigate to next module after a brief pause
+          setTimeout(() => {
+            navigate(nextModuleId ? `/module/${nextModuleId}` : '/dashboard')
+          }, 1500)
+        }
         setCompleting(false)
       }
     }
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
-  }, [execAttempted, moduleId])
+  }, [moduleId, nextModuleId])
 
   const currentStatus = moduleId ? progress[moduleId]?.status ?? 'not_started' : 'not_started'
   const isCompleted = currentStatus === 'completed' || markedComplete
@@ -195,7 +216,12 @@ export function ModulePage() {
     if (!moduleId) return
     setCompleting(true)
     const ok = await markComplete(moduleId)
-    if (ok) setMarkedComplete(true)
+    if (ok) {
+      setMarkedComplete(true)
+      setTimeout(() => {
+        navigate(nextModuleId ? `/module/${nextModuleId}` : '/dashboard')
+      }, 1500)
+    }
     setCompleting(false)
   }
 
@@ -234,8 +260,16 @@ export function ModulePage() {
   const isAcademySection = (section: 'video' | 'resources' | 'recordings' | 'exec') =>
     academyTargetSection === section
 
+  // Detect when the iframe is the only content section — used to expand it to fill the page
+  const hasVideoSection = !!(content.video_url || content.video_url_extension || isAcademySection('video') || sectionIframe('video'))
+  const hasResourcesSection = docs.length > 0 || isAcademySection('resources') || !!sectionIframe('resources')
+  const hasScenarioSection = !!content.scenario
+  const hasRecordingsSection = recordings.length > 0 || isAcademySection('recordings') || !!sectionIframe('recordings')
+  const hasStepGuideSection = !!content.step_guide
+  const singleIframeMode = hasAcademy && !hasVideoSection && !hasResourcesSection && !hasScenarioSection && !hasRecordingsSection && !hasStepGuideSection && !content.exec_url
+
   // Renders the Academy/iframe embed used when a section is overridden
-  const IframeEmbed = ({ title, url }: { title: string; url: string }) => {
+  const IframeEmbed = ({ title, url, height = '560px' }: { title: string; url: string; height?: string }) => {
     const [failed, setFailed] = useState(false)
     // Detect embed block via timeout — X-Frame-Options errors don't fire onError on iframes
     const [timedOut, setTimedOut] = useState(false)
@@ -266,7 +300,7 @@ export function ModulePage() {
       )
     }
     return (
-      <div className="rounded-lg overflow-hidden border border-gray-200 relative" style={{ height: '560px' }}>
+      <div className="rounded-lg overflow-hidden border border-gray-200 relative" style={{ height }}>
         {!loaded && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pendo-pink" />
@@ -308,7 +342,7 @@ export function ModulePage() {
         {academyCourses.length === 1 && (
           <p className="text-sm font-medium text-pendo-navy mb-3">{course.label}</p>
         )}
-        <IframeEmbed title={course.label || module!.title} url={course.url} />
+        <IframeEmbed title={course.label || module!.title} url={course.url} height={singleIframeMode ? 'calc(100vh - 320px)' : '560px'} />
       </div>
     )
   }
@@ -535,6 +569,12 @@ export function ModulePage() {
 
           {/* 5. Record — exec.com */}
           {((content.exec_url || (content.exec_prompt && content.exec_url)) || isAcademySection('exec') || sectionIframe('exec')) && (
+            singleIframeMode ? (
+              // Full-width, no card chrome — iframe fills the remaining viewport
+              <div className="rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+                <AcademyCoursesBlock />
+              </div>
+            ) : (
             <Section
               title={isAcademySection('exec') || sectionIframe('exec') ? courseBlockLabel : 'Record — Practice with exec.com'}
               icon={
@@ -570,6 +610,7 @@ export function ModulePage() {
               </button>
               </>)}
             </Section>
+            )
           )}
         </div>
 
@@ -587,10 +628,13 @@ export function ModulePage() {
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              Module Complete — next module unlocked!
+              {completing ? 'Saving…' : `Module Complete — ${nextModuleId ? 'navigating to next module…' : 'returning to dashboard…'}`}
             </div>
+          ) : singleIframeMode ? (
+            // Embedded exec course — completion is automatic via postMessage, no button needed
+            <p className="text-sm text-gray-400 italic">Complete the course above to unlock the next module</p>
           ) : content.exec_url ? (
-            // Exec-gated modules: completion flows from the scenario
+            // New-tab exec flow — show manual fallback after they've opened exec.com
             execAttempted ? (
               <div className="flex flex-col items-end gap-1">
                 <button
