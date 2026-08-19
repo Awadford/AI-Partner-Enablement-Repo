@@ -350,7 +350,7 @@ export function ModulePage() {
 
   return (
     <Layout>
-      <div className={`${singleIframeMode ? 'max-w-6xl' : 'max-w-3xl'} mx-auto py-8 px-4 sm:px-6`}>
+      <div className={`${singleIframeMode ? 'max-w-none px-4 sm:px-8' : 'max-w-3xl px-4 sm:px-6'} mx-auto py-8`}>
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
           <Link to="/dashboard" className="hover:text-pendo-pink transition-colors">My Learning Path</Link>
