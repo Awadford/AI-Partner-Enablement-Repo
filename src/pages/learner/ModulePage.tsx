@@ -380,7 +380,7 @@ export function ModulePage() {
               ) : (
                 <VideoPlayer url={content.video_url} title={module.title} onOpenModal={(url, t) => setModalLink({ url, title: t })} />
               )
-            )}
+            ) : null}
           </Section>
           )}
 
