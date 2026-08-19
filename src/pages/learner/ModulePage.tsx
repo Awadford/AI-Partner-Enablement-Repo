@@ -269,13 +269,13 @@ export function ModulePage() {
   const singleIframeMode = hasAcademy && !hasVideoSection && !hasResourcesSection && !hasScenarioSection && !hasRecordingsSection && !hasStepGuideSection && !content.exec_url
 
   // Renders the Academy/iframe embed used when a section is overridden
-  const IframeEmbed = ({ title, url, height = '560px' }: { title: string; url: string; height?: string }) => {
+  const IframeEmbed = ({ title, url, height = '560px', embedTimeout = 20000 }: { title: string; url: string; height?: string; embedTimeout?: number }) => {
     const [failed, setFailed] = useState(false)
     // Detect embed block via timeout — X-Frame-Options errors don't fire onError on iframes
     const [timedOut, setTimedOut] = useState(false)
     const [loaded, setLoaded] = useState(false)
     useEffect(() => {
-      const t = setTimeout(() => { if (!loaded) setTimedOut(true) }, 4000)
+      const t = setTimeout(() => { if (!loaded) setTimedOut(true) }, embedTimeout)
       return () => clearTimeout(t)
     }, [loaded])
     const blocked = failed || timedOut
@@ -302,8 +302,9 @@ export function ModulePage() {
     return (
       <div className="rounded-lg overflow-hidden border border-gray-200 relative" style={{ height }}>
         {!loaded && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 gap-3">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pendo-pink" />
+            <p className="text-sm text-gray-400">Loading course…</p>
           </div>
         )}
         <iframe
@@ -342,7 +343,7 @@ export function ModulePage() {
         {academyCourses.length === 1 && (
           <p className="text-sm font-medium text-pendo-navy mb-3">{course.label}</p>
         )}
-        <IframeEmbed title={course.label || module!.title} url={course.url} height={singleIframeMode ? 'calc(100vh - 320px)' : '560px'} />
+        <IframeEmbed title={course.label || module!.title} url={course.url} height={singleIframeMode ? 'calc(100vh - 320px)' : '560px'} embedTimeout={singleIframeMode ? 60000 : 20000} />
       </div>
     )
   }
